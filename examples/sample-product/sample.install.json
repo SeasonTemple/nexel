@@ -1,0 +1,48 @@
+{
+  "$schemaDescription": "Sample product installer manifest. Demonstrates the minimum viable shape: 1 skill + 1 agent + 1 rule + 1 bundle. The schema is identical across all downstream products — only ids and paths change.",
+  "schemaVersion": 1,
+  "skills": {
+    "sample:hello-world": {
+      "id": "sample:hello-world",
+      "dirname": "hello-world",
+      "sourcePath": "skills/hello-world",
+      "category": "best-practice",
+      "profile": "standalone",
+      "description": "Minimal hello-world skill demonstrating the SKILL.md frontmatter contract."
+    },
+    "sample:demo-bundle-skill": {
+      "id": "sample:demo-bundle-skill",
+      "dirname": "demo-bundle-skill",
+      "sourcePath": "skills/demo-bundle-skill",
+      "category": "principle",
+      "profile": "bundle",
+      "description": "Bundle-profile skill that pulls in the sample agent + rule via dependencies.",
+      "dependencies": {
+        "agents": ["example-agent"],
+        "rules": ["rules/sample-rule.md"]
+      }
+    }
+  },
+  "agents": {
+    "example-agent": {
+      "id": "example-agent",
+      "sourcePath": "agents/sample-example-agent.md",
+      "installedName": "sample-example-agent",
+      "description": "Minimal sample agent — demonstrates agent frontmatter and installedName mapping."
+    }
+  },
+  "rules": {
+    "rules/sample-rule.md": {
+      "sourcePath": "rules/sample-rule.md",
+      "description": "Minimal sample rule — plain markdown, no frontmatter."
+    }
+  },
+  "bundles": {
+    "sample-demo": {
+      "id": "sample-demo",
+      "description": "Demo bundle that installs the demo-bundle-skill plus its agent + rule dependencies.",
+      "skills": ["sample:demo-bundle-skill"],
+      "agents": ["example-agent"]
+    }
+  }
+}

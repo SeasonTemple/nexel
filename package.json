@@ -1,0 +1,74 @@
+{
+  "name": "skillctl",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Kernel library for managing agent skills, agents, and rules across Claude Code, Codex, and OpenCode — product-agnostic installer driven by a per-product ProductConfig.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SeasonTemple/skillctl.git"
+  },
+  "homepage": "https://github.com/SeasonTemple/skillctl",
+  "bugs": {
+    "url": "https://github.com/SeasonTemple/skillctl/issues"
+  },
+  "keywords": [
+    "skills",
+    "agents",
+    "installer",
+    "skill-management",
+    "claude-code",
+    "codex",
+    "opencode",
+    "kernel-library",
+    "skillctl"
+  ],
+  "main": "./scripts/installer/index.mjs",
+  "exports": {
+    ".": "./scripts/installer/index.mjs",
+    "./adapters/claude": "./scripts/installer/adapters/claude.mjs",
+    "./adapters/codex": "./scripts/installer/adapters/codex.mjs",
+    "./adapters/opencode": "./scripts/installer/adapters/opencode.mjs",
+    "./lint-skills": "./scripts/lint-skills.mjs"
+  },
+  "files": [
+    "scripts/installer/**/*.mjs",
+    "scripts/lint-skills.mjs",
+    "scripts/install-husky.mjs",
+    "examples/sample-product/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "lint:skills": "node scripts/lint-skills.mjs",
+    "lint:manifest": "node scripts/installer/core/manifest/validator.mjs",
+    "lint:drift": "node scripts/installer/core/manifest/drift.mjs",
+    "fix:drift": "node scripts/installer/core/manifest/drift.mjs --fix",
+    "test:lint": "node --test scripts/lint-skills.test.mjs",
+    "test:loader": "node --test scripts/installer/core/manifest/loader.test.mjs",
+    "test:argv": "node --test scripts/installer/cli/argv.test.mjs",
+    "test:dispatch": "node --test scripts/installer/cli/dispatch.test.mjs",
+    "test:spi": "node --test scripts/installer/adapters/spi.test.mjs",
+    "test:architecture": "node --test scripts/installer/architecture.test.mjs",
+    "test:sample-bin": "node --test examples/sample-product/sample-bin.test.mjs",
+    "test": "node --test scripts/lint-skills.test.mjs scripts/installer/core/manifest/loader.test.mjs scripts/installer/cli/argv.test.mjs scripts/installer/cli/dispatch.test.mjs scripts/installer/adapters/spi.test.mjs scripts/installer/architecture.test.mjs examples/sample-product/sample-bin.test.mjs",
+    "setup:hooks": "husky",
+    "prepare": "node scripts/install-husky.mjs",
+    "release:patch": "npm version patch -m \"chore(release): %s\"",
+    "release:minor": "npm version minor -m \"chore(release): %s\"",
+    "release:major": "npm version major -m \"chore(release): %s\""
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "yaml": "^2.6.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.3.0",
+    "figlet": "^1.11.0",
+    "proper-lockfile": "^4.1.2",
+    "write-file-atomic": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
