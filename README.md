@@ -22,7 +22,7 @@
 
 `skillctl` is a kernel library. Downstream products supply a `ProductConfig` plus a manifest, and `skillctl` handles validation, planning, install / uninstall / update, state tracking, drift detection, and multi-adapter dispatch. The library itself is product-agnostic — your product's bin name, skill-id prefix, agent name prefix, manifest filename, and env var namespace all come from `ProductConfig`.
 
-**Status**: v0.1.0 — first OSS release. API surface is stable; expect minor pre-1.0 iteration based on adopter feedback.
+> **Status:** v0.1.0 — first OSS release. API surface is stable; expect minor pre-1.0 iteration based on adopter feedback.
 
 ## Install
 
@@ -32,11 +32,11 @@ npm install skillctl
 
 Requires Node ≥ 18. ESM only.
 
-## 30-second quick start
+## 30-Second Quick Start
 
 The repo ships a complete worked example under [`examples/sample-product/`](./examples/sample-product/):
 
-```
+```text
 examples/sample-product/
 ├── agent-skills.config.mjs    # ProductConfig (only product-identity surface)
 ├── sample.install.json        # Manifest
@@ -63,18 +63,19 @@ The bin is branded with whatever `productConfig.binName` you set. `skillctl` its
 import { defineProductConfig } from "skillctl";
 
 export default defineProductConfig({
-  productName:         "my-skills",
-  skillIdPrefix:       "my",                // skill ids must start with "my:"
-  agentNamePrefix:     "my-",               // agent installedName must start with "my-"
+  productName: "my-skills",
+  skillIdPrefix: "my", // skill ids must start with "my:"
+  agentNamePrefix: "my-", // agent installedName must start with "my-"
   defaultManifestFile: "my.install.json",
-  binName:             "my-skills",
+  binName: "my-skills",
 
   // Optional (kernel defaults shown):
   defaultSkillsDir: "skills",
   defaultAgentsDir: "agents",
-  defaultRulesDir:  "rules",
-  envProfile:       "MY_SKILLS_PROFILE",    // for sandbox/profile isolation
-  envBannerTitle:   "MY_SKILLS_BANNER_TITLE",
+  defaultRulesDir: "rules",
+  targetPathLayout: { skills: "skills", agents: "agents" },
+  envProfile: "MY_SKILLS_PROFILE", // for sandbox/profile isolation
+  envBannerTitle: "MY_SKILLS_BANNER_TITLE",
 });
 ```
 
@@ -82,16 +83,17 @@ Rules: `skillIdPrefix` may not contain `:`; `agentNamePrefix` must end with `-`.
 
 ## Public API
 
-`scripts/installer/index.mjs` re-exports the entire stable surface:
+`scripts/installer/index.mjs` re-exports the v1 stability contract. Adding new exports is backward-compatible; removing or renaming is a breaking change.
 
 | Category | Exports |
 |---|---|
 | **Factories** | `createCli`, `createAdapterRegistry`, `defineProductConfig` |
 | **CLI primitives** | `parseArgs`, `printHelp`, `handleError`, `formatSkipNote`, `dispatchVerb`, `KERNEL_HANDLERS`, `strings` |
 | **Verb handlers** | `runList`, `runAgents`, `runValidate`, `runExport`, `runImport`, `runRepair`, `runDoctor`, `runPlan`, `runInstall`, `runUninstall`, `runUpdate`, `resolveSelections` |
-| **Manifest pipeline** | `loadManifest`, `validateManifest`, `defaultManifestPath`, `defaultPaths`, `pipeline` |
-| **Adapter SPI** | `SPI_REQUIRED`, `SPI_DEFAULTS`, `validateAdapter` |
-| **Asset model** | `assetTypes`, `defaultTargetMapping`, `whichSync` |
+| **Manifest pipeline** | `loadManifest`, `validateManifest`, `defaultManifestPath`, `defaultPaths`, `pipeline`, `detectDrift`, `exitCodeFor`, `formatFindings`, `SCHEMA_VERSION`, `PROFILES`, `CATEGORIES`, `HOSTS` |
+| **Adapter SPI** | `SPI_REQUIRED`, `SPI_DEFAULTS`, `validateAdapter`, `applyAdapterDefaults`, `ADAPTERS`, `getAdapter`, `listAdapterStatus`, `assertSupportsDirect`, `assertCliPresent` |
+| **Asset model** | `assetTypes`, `getAssetType`, `defaultTargetMapping`, `whichSync` |
+| **Plan-time utilities** | `buildInstallPlan`, `resolveSelection`, `transitiveAssets`, `formatPlanText` |
 | **Kernel commands** | `install`, `installMulti`, `uninstall`, `uninstallMulti`, `update`, `updateMulti`, `repair`, `exportCommand`, `importCommand`, `listCommand`, `agentsCommand`, `doctorCommand`, `planCommandText`, `planSelection` |
 | **Errors** | `CommandError`, `AdapterError`, `ProductConfigError`, `StateError`, `FsError`, `PlanError`, `CancelledError`, all `ERR_*` codes |
 
@@ -110,18 +112,58 @@ The public API barrel (`index.mjs`) is the only entry point downstream consumers
 
 ## Adapter SPI
 
-Three built-in adapters ship out of the box: Claude Code, Codex, OpenCode. Downstream products supply additional adapters by passing modules to `createCli({ adapters: [...] })`. Each adapter exposes: `id`, `displayName`, `cliBinary`, `cliInstallUrl`, `supportsDirect`, `supportedAssetTypes`, `detectTargetRoot({ env })`, `mapTargetPath(asset, manifest)`, `doctorProbes`, `pluginInstallInstructions`.
+Three built-in adapters ship out of the box: Claude Code, Codex, OpenCode. Downstream products supply additional adapters by passing modules to `createCli({ adapters: [...] })`.
 
-See [`scripts/installer/adapters/spi.mjs`](./scripts/installer/adapters/spi.mjs) for the canonical SPI; [`scripts/installer/adapters/claude.mjs`](./scripts/installer/adapters/claude.mjs) for a complete worked example.
+Each adapter exports the following SPI v1 contract:
+
+| Field | Required | Type / signature |
+|---|---|---|
+| `id` | yes | `string` — unique identifier |
+| `displayName` | yes | `string` — user-visible name |
+| `detectTargetRoot` | yes | `({ override, env }) => string` |
+| `detectStatus` | yes | `({ override, env }) => StatusObject` |
+| `mapTargetPath` | no | `(asset, manifest, productConfig) => relPath` |
+| `supportedAssetTypes` | no | `Array<"skill" \| "agent" \| "rule">` |
+| `pluginInstallInstructions` | no | `() => string` |
+| `supportsDirect` | no | `boolean` |
+| `cliBinary` | no | `string` (`""` skips CLI presence check) |
+| `cliInstallUrl` | no | `string` |
+| `doctorProbes` | no | `({ targetRoot, env, productConfig }) => Array<{ name, ok, detail }>` |
+
+Optional fields are filled with kernel defaults from `SPI_DEFAULTS` when omitted. See [`scripts/installer/adapters/spi.mjs`](./scripts/installer/adapters/spi.mjs) for the canonical contract and [`scripts/installer/adapters/claude.mjs`](./scripts/installer/adapters/claude.mjs) for a complete worked example.
 
 ## Verbs
 
-```
-install   uninstall   update    list      plan      agents
-doctor    repair      export    import    validate  help
-```
+| Verb | Purpose |
+|---|---|
+| `install` | Install skills / agents / rules into one or more adapter targets |
+| `uninstall` | Remove previously installed assets |
+| `update` | Re-install assets, preserving user-modified files unless `--overwrite` |
+| `repair` | Re-install only assets that have drifted from the manifest |
+| `plan` | Preview what `install` / `update` would do, without writing |
+| `list` | Print skills and bundles from the manifest |
+| `agents` | Print known adapter targets and their status |
+| `validate` | Lint a single `SKILL.md` file against frontmatter rules |
+| `export` | Archive installed state to a portable file |
+| `import` | Restore state from an exported archive |
+| `doctor` | Check adapter health and installed-asset integrity |
+| `help` | Print usage (handled in the CLI shell, not dispatched as a kernel verb) |
 
-All verbs accept `--json` for machine-readable output. Verbs that touch state (`install` / `uninstall` / `update` / `repair`) accept `--agent <id>` (repeatable), `--target <path>`, `--profile <name>`, `--skill <id>`, `--bundle <id>`, `--all`, `--dry-run`, `--yes`, `--overwrite`, `--force`, `--accept-modified <relPath>`.
+All verbs accept `--json` for machine-readable output. The following flags apply to the state-mutating verbs (`install`, `uninstall`, `update`, `repair`); `plan` also accepts the selection subset:
+
+| Flag | Argument | Purpose |
+|---|---|---|
+| `--agent` | `<id>` (repeatable) | Limit to specific adapter target(s) |
+| `--skill` | `<id>` | Select a single skill |
+| `--bundle` | `<id>` | Select a bundle |
+| `--all` | — | Select every manifest entry |
+| `--target` | `<path>` | Override the adapter target root |
+| `--profile` | `<name>` | Activate a sandbox / env profile |
+| `--dry-run` | — | Preview changes without writing |
+| `--yes` | — | Skip confirmation prompts |
+| `--overwrite` | — | Overwrite user-modified files |
+| `--force` | — | Bypass safety checks |
+| `--accept-modified` | `<relPath>` | Mark a specific file as intentionally modified |
 
 Run `node examples/sample-product/bin.mjs help` for the full reference, dynamically rendered with your `productConfig.binName`.
 
@@ -133,7 +175,7 @@ npm test
 
 7 test suites covering parser, dispatch, manifest loader, adapter SPI conformance, architecture-layer guards, skill linter, and an end-to-end sample bin smoke test. Individual suites:
 
-```
+```sh
 npm run test:lint           # SKILL.md frontmatter validator
 npm run test:loader         # manifest path resolution
 npm run test:argv           # CLI arg parser
@@ -154,4 +196,4 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Contributing
 
-Issues and PRs welcome. Open an issue first for non-trivial changes so the direction can be discussed.
+Issues and PRs welcome. For non-trivial changes — new adapters, new verbs, public API additions, or architectural shifts — open a GitHub issue first so the direction can be aligned before implementation work starts. Bug fixes, documentation improvements, and additions to the sample fixture can go straight to a PR.
