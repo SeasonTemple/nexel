@@ -10,6 +10,11 @@
 // entry; users would invoke it as `<binName> install --agent codex`.
 // In this repo it lives under examples/ so the skillctl test suite
 // can exercise the kernel against a real productConfig end-to-end.
+//
+// Driving this bin from an AI agent? The product-agnostic behavioral
+// contract every skillctl-derived bin honors (verbs, exit codes,
+// --json envelope, non-interactive flags, help affordances) is
+// documented in docs/AGENT-CLI-CONTRACT.md.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
