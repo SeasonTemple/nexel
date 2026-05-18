@@ -1,5 +1,5 @@
 {
-  "name": "skillctl",
+  "name": "nexel",
   "version": "0.4.0",
   "private": true,
   "type": "module",
@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SeasonTemple/skillctl.git"
+    "url": "https://github.com/SeasonTemple/nexel.git"
   },
-  "homepage": "https://github.com/SeasonTemple/skillctl",
+  "homepage": "https://github.com/SeasonTemple/nexel",
   "bugs": {
-    "url": "https://github.com/SeasonTemple/skillctl/issues"
+    "url": "https://github.com/SeasonTemple/nexel/issues"
   },
   "keywords": [
     "skills",
@@ -22,7 +22,7 @@
     "codex",
     "opencode",
     "kernel-library",
-    "skillctl"
+    "nexel"
   ],
   "main": "./scripts/installer/index.mjs",
   "exports": {
