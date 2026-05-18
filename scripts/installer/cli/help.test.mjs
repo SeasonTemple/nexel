@@ -114,10 +114,38 @@ test("renderHelp verb path emits exactly strings.help.verb output (no wrapping)"
   assert.equal(printed, direct);
 });
 
-test("renderHelp: no `stream` key (the cli.mjs call shape) does not throw and routes", () => {
-  // Regression guard for the stream=process.stdout default invariant.
-  // cli.mjs calls renderHelp WITHOUT a stream; absent the default this
-  // would do `undefined.write(...)` on every real `<bin> <verb> --help`.
+test("renderHelp: threads an injected stream to the verb path (real threading guard)", () => {
+  // Teeth: if renderHelp drops `stream` instead of threading it to
+  // printVerbHelp, these writes never reach the injected sink and the
+  // assertions fail. (A no-stream-key test alone is hollow — JS default
+  // params mean printVerbHelp's own `= process.stdout` default would
+  // absorb an undefined, so it passes whether or not renderHelp threads.)
+  const writes = [];
+  const sink = { write: (c) => { writes.push(String(c)); return true; } };
+  renderHelp({
+    args: { help: true, verb: "install", positional: [] },
+    productConfig: PC, version: "0.0.0", adapters: ADAPTERS, stream: sink,
+  });
+  const out = writes.join("");
+  assert.match(out, /stub-bin install —/, "verb block must reach the injected stream");
+  assert.ok(!out.includes(FULL_ONLY));
+});
+
+test("renderHelp: threads an injected stream to the full-body fallback", () => {
+  const writes = [];
+  const sink = { write: (c) => { writes.push(String(c)); return true; } };
+  renderHelp({
+    args: { help: false, verb: "help", positional: [] },
+    productConfig: PC, version: "0.0.0", adapters: ADAPTERS, stream: sink,
+  });
+  assert.ok(writes.join("").includes(FULL_ONLY), "full body must reach the injected stream");
+});
+
+test("renderHelp: no `stream` key (the exact cli.mjs call shape) does not throw and reaches stdout", () => {
+  // The cli.mjs call site passes no stream. End-to-end this works via the
+  // default chain (renderHelp's `= process.stdout`, and printVerbHelp's
+  // own as defense-in-depth). This guards the call-shape contract; the
+  // threading test above is what guards stream being honored when given.
   const out = capture(() => renderHelp({
     args: { help: true, verb: "install", positional: [] },
     productConfig: PC, version: "0.0.0", adapters: ADAPTERS,

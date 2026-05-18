@@ -100,6 +100,16 @@ test("sample bin: `install --help` renders the verb-scoped block, not the full t
   assert.ok(!r.stdout.includes("Common flags:"), "verb help must not emit the full flag table");
 });
 
+test("sample bin: `help install` (positional order) renders the verb-scoped block", () => {
+  // Exercises the cli.mjs gate's `args.verb === "help"` + positional[0]
+  // branch through a real createCli bin — the help.mjs unit suite calls
+  // renderHelp directly and cannot reach this composition.
+  const r = runBin(["help", "install"]);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /^sample-installer install — install selected skills\/bundles/);
+  assert.ok(!r.stdout.includes("Common flags:"), "verb help must not emit the full flag table");
+});
+
 test("sample bin: `install help` (reverse order) dispatches the install handler, NOT verb help", () => {
   const r = runBin(["install", "help"]);
   // `help` is a positional arg to the `install` verb — the cli.mjs help

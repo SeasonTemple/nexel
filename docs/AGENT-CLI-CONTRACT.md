@@ -32,7 +32,7 @@ all are product-supplied via `ProductConfig`.
 
 ## 1. Verbs
 
-Eleven kernel verbs are always available (plus `help`). All accept `--json`.
+Eleven kernel verbs are always available (plus `help`). All accept `--json` for machine-readable output, with one exception: `export` **always** emits a JSON envelope (it is a machine-to-machine format) — passing `--json` to it is a no-op, not an error.
 
 | Verb | Purpose |
 |---|---|
@@ -71,7 +71,7 @@ Eleven kernel verbs are always available (plus `help`). All accept `--json`.
 | Exit | Meaning |
 |---|---|
 | `0` | Success — or a help/unknown-verb fallback render |
-| non-zero (typed) | A kernel error. The error's own exit code if it sets one, else `1`. `doctor` and `validate` exit `1` when a check / lint fails; `validate` exits `2` on a YAML parse error |
+| non-zero (typed) | A kernel error. The error's own exit code if it sets one, else `1`. `doctor` exits `1` when a check fails. `validate` exits `1` on **any** lint finding (including a YAML parse error in the target `SKILL.md`); it exits `2` only for a precondition failure — missing path argument or file-not-found |
 | `130` | Cancelled (interactive prompt aborted, e.g. Ctrl-C) — `cancelled at <stage>` on stderr |
 
 In `--json` mode, an error is emitted on **stdout** as a uniform envelope:

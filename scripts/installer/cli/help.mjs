@@ -1,10 +1,16 @@
-// printHelp — render top-level help text by composing string blocks from
-// cli/strings.mjs. productConfig provides binName / skillIdPrefix /
-// envProfile / envBannerTitle; adapters list is supplied by the caller.
+// Help rendering + routing. Four surfaces:
+//   - printHelp     — composes the top-level full body from the
+//                     cli/strings.mjs blocks (byte-stable; R2 guard).
+//   - renderHelp    — the shared routing entry point: `<verb> --help`
+//                     and `help <verb>` → verb-scoped block; everything
+//                     else → printHelp fallback.
+//   - hasVerbHelp   — predicate: does this verb have a per-verb block?
+//   - printVerbHelp — writes one verb's scoped block (private).
 //
-// The actual text lives in cli/strings.mjs (the i18n seam). Future
-// locale providers can override individual blocks without touching this
-// module.
+// productConfig provides binName / skillIdPrefix / envProfile /
+// envBannerTitle; the adapters list is supplied by the caller. The
+// actual text lives in cli/strings.mjs (the i18n seam) — future locale
+// providers can override individual blocks without touching this module.
 
 import { strings } from "./strings.mjs";
 
