@@ -1,7 +1,7 @@
 ---
 title: "feat: ADR-0004-deferred product-coupled test sweep"
 type: feat
-status: active
+status: completed
 date: 2026-05-18
 ---
 
