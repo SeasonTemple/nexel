@@ -1,7 +1,7 @@
 ---
 title: "refactor: complete the nexel rename — unfreeze STATE_DIRNAME + drop misleading badge"
 type: refactor
-status: active
+status: completed
 date: 2026-05-18
 ---
 
