@@ -6,8 +6,6 @@
 
 **通用 Agent 技能管理内核库 — 统一管理 Claude Code、Codex、OpenCode 上的 skills/agents/rules。**
 
-<!-- npm badge 有意仍指向无关的第三方 `skillctl` 包；2a 不改名 —— 其去留属 2b npm 发布工作（ADR-0007）。 -->
-[![npm version](https://img.shields.io/npm/v/skillctl?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/skillctl)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)

@@ -6,8 +6,6 @@
 
 **Product-agnostic kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode.**
 
-<!-- npm badge intentionally still references the unrelated third-party `skillctl` package; not renamed in 2a — its disposition belongs to the 2b npm-publish work (ADR-0007). -->
-[![npm version](https://img.shields.io/npm/v/skillctl?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/skillctl)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)

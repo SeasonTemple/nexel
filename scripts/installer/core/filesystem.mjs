@@ -25,7 +25,7 @@ import {
 export const TEXT_EXTENSIONS = Object.freeze([".md", ".json", ".mjs", ".js", ".yaml", ".yml", ".txt"]);
 const TEXT_EXT_SET = new Set(TEXT_EXTENSIONS);
 
-export const STATE_DIRNAME = ".skillctl";
+export const STATE_DIRNAME = ".nexel";
 export const STATE_FILE = "state.json";
 export const STATE_BAK = "state.json.bak";
 export const STATE_TMP = "state.json.tmp";

@@ -18,14 +18,13 @@
 //   - The four-manifest version lockstep (.claude-plugin/marketplace.json,
 //     plugin.json x2). nexel ships no plugin manifests — there is
 //     nothing to lockstep.
-//   - The README release-badge check. nexel has no static
-//     `releases-vX.Y.Z` badge: its only version-bearing badge is the
-//     *dynamic* npm badge (shields.io/npm/v/skillctl — deliberately the
-//     unrelated third-party `skillctl` package, NOT this project) which
-//     (a) cannot drift (it is fetched, not hardcoded) and (b) points at
-//     that third-party package on purpose — see ADR-0007 (which supersedes
-//     ADR-0005). A badge check would be both inapplicable and misleading.
-//     Rationale also recorded in ADR-0004.
+//   - The README release-badge check. nexel has no version-bearing
+//     README badge at all: the misleading dynamic npm badge (which
+//     pointed at the unrelated third-party `skillctl` package, not this
+//     project) was removed in the residual-cleanup release (ADR-0008).
+//     A correct `nexel` npm badge is deferred to the publish work (2b),
+//     additive when the package is actually published. Until then there
+//     is no README version badge to check — the check stays absent.
 //
 // Usage:
 //   node scripts/lint-release-sync.mjs            # text report, exit 0/1

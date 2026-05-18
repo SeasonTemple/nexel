@@ -174,7 +174,7 @@ export async function install({
 
   if (dryRun) {
     // Dry-run is read-only — do NOT recoverySweep (writes) or acquireLock (creates state dir).
-    // This keeps `--dry-run` from leaving empty .skillctl/ directories in user $HOME.
+    // This keeps `--dry-run` from leaving empty .nexel/ directories in user $HOME.
     const initialState = readState(targetRoot) || emptyState({
       installerVersion,
       agentId: adapter?.id || "custom",
@@ -516,7 +516,7 @@ export async function uninstall({
   const { adapter, targetRoot } = resolveAdapterAndTarget({ adapterId, target, env, productConfig });
 
   // Pre-check state.json existence BEFORE recoverySweep/acquireLock to avoid creating
-  // empty .skillctl/ dir in $HOME when uninstall is called on a clean target.
+  // empty .nexel/ dir in $HOME when uninstall is called on a clean target.
   if (!readState(targetRoot)) {
     throw new CommandError("no state.json at target; nothing to uninstall", ERR_NO_STATE);
   }
@@ -621,7 +621,7 @@ export async function update({
   if (adapter && !target) assertCliPresent(adapter.id, { env });
 
   // Pre-check state.json existence BEFORE recoverySweep/acquireLock so a "no install" target
-  // does not get an empty .skillctl/ dir written into $HOME.
+  // does not get an empty .nexel/ dir written into $HOME.
   if (!readState(targetRoot)) {
     throw new CommandError("no state.json at target; nothing to update", ERR_NO_STATE);
   }
