@@ -4,28 +4,82 @@
 
 # nexel
 
-**Product-agnostic kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode.**
+**A product-agnostic kernel for shipping one agent-skill pack across Claude Code, Codex, and OpenCode.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-159%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-253%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
-[English](./README.md) · [中文](./README.zh-CN.md) · [Quick start](#30-second-quick-start) · [API](#public-api) · [Examples](./examples/sample-product/)
+[English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Core model](#core-model) · [Quick start](#quick-start) · [Reference](#reference) · [AI agents](#for-ai-agents) · [Examples](./examples/sample-product/)
 
 </div>
 
 ---
 
-## Overview
+## Why nexel
 
-`nexel` is a kernel library. Downstream products supply a `ProductConfig` plus a manifest, and `nexel` handles validation, planning, install / uninstall / update, state tracking, drift detection, and multi-adapter dispatch. The library itself is product-agnostic — your product's bin name, skill-id prefix, agent name prefix, manifest filename, and env var namespace all come from `ProductConfig`.
+You maintain a pack of agent skills, subagents, and rules, and you want it
+installed across Claude Code, Codex, and OpenCode. Each tool stores assets in
+a different place and expects a different frontmatter shape — so "ship my pack
+everywhere" decays into N install scripts, N state files, and N drift checks,
+re-derived per tool and re-debugged on every change.
 
-> **Status:** pre-1.0. Name resolved to `nexel`; not published to npm yet — publish and the public-API contract clock are deliberately decoupled from the name decision and sequenced later (see [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md), which supersedes [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)). The public surface is still iterating; pin a tag.
+`nexel` is the kernel that absorbs that work. You author **one
+`ProductConfig` and one manifest**; the kernel owns validation, planning,
+install / uninstall / update, state tracking, drift detection, and per-adapter
+dispatch. Nothing in the kernel knows your product — bin name, skill-id
+prefix, agent-name prefix, manifest filename, and env namespace all come from
+your config. Supporting a new CLI is adding an adapter, not a rewrite.
+
+> Driving a nexel-derived bin from an agent rather than authoring one? Skip to
+> [For AI agents](#for-ai-agents) — the behavioral contract is specified
+> separately and is stable kernel surface.
+
+## Core model
+
+Five nouns. Internalize these and the rest of this document follows.
+
+| Term | What it is |
+|---|---|
+| **Kernel** | The product-agnostic library in `scripts/installer/`. Owns install / uninstall / update / state / drift / plan. Knows nothing about any product's content. |
+| **ProductConfig** | The frozen per-product identity you pass in (`productName`, `skillIdPrefix`, …). The kernel is inert without one. |
+| **Adapter** | A per-CLI integration (Claude Code, Codex, OpenCode). Decides where assets land and how their content is transformed. |
+| **Asset** | A unit the kernel installs — exactly one of **skill**, **agent**, or **rule**. Not a generic file. |
+| **Manifest** | `install.json` — the single source of truth. An asset is visible to the kernel **iff** it has a manifest entry. |
+
+> One **Kernel** is configured by one **ProductConfig** per consuming product;
+> a **Manifest** declares which **Assets** exist; an **Adapter** maps and
+> transforms those assets onto a target CLI.
+
+## Quick start
+
+The repo ships a complete, runnable example under
+[`examples/sample-product/`](./examples/sample-product/) — see it work before
+wiring your own:
+
+```text
+examples/sample-product/
+├── agent-skills.config.mjs    # ProductConfig (the only product-identity surface)
+├── sample.install.json        # Manifest
+├── skills/  agents/  rules/   # Content
+├── bin.mjs                    # Wraps createCli with the config above
+└── sample-bin.test.mjs        # End-to-end spawnSync tests
+```
+
+```sh
+node examples/sample-product/bin.mjs help
+node examples/sample-product/bin.mjs list --json
+node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-world
+```
+
+The bin is branded with whatever `productConfig.binName` you set; `nexel`
+never appears in user-facing text once wired up.
 
 ## Install
 
-Not on npm. Consume via a pinned git tag — clone, a git dependency, or vendoring:
+Not on npm. Consume via a pinned git tag — clone, a git dependency, or
+vendoring:
 
 ```sh
 # git dependency (package.json), pinned to a release tag
@@ -37,34 +91,13 @@ npm install "git+https://github.com/<owner>/nexel.git#v0.3.0"
 git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.3.0
 ```
 
-Release notes per tag live in [`docs/release-notes/`](./docs/release-notes/). Requires Node ≥ 18. ESM only.
-
-## 30-Second Quick Start
-
-The repo ships a complete worked example under [`examples/sample-product/`](./examples/sample-product/):
-
-```text
-examples/sample-product/
-├── agent-skills.config.mjs    # ProductConfig (only product-identity surface)
-├── sample.install.json        # Manifest
-├── skills/  agents/  rules/   # Content
-├── bin.mjs                    # Wraps createCli with the config above
-└── sample-bin.test.mjs        # End-to-end spawnSync tests
-```
-
-Run it:
-
-```sh
-node examples/sample-product/bin.mjs help
-node examples/sample-product/bin.mjs list --json
-node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-world
-```
-
-The bin is branded with whatever `productConfig.binName` you set. `nexel` itself never appears in user-facing text once wired up.
+Requires Node ≥ 18, ESM only. Per-tag release notes live in
+[`docs/release-notes/`](./docs/release-notes/).
 
 ## ProductConfig
 
-`defineProductConfig({...})` is the only product-identity surface. Required fields fail loud at construction time:
+`defineProductConfig({...})` is the only product-identity surface. Required
+fields fail loud at construction time:
 
 ```js
 import { defineProductConfig } from "nexel";
@@ -86,11 +119,50 @@ export default defineProductConfig({
 });
 ```
 
-Rules: `skillIdPrefix` may not contain `:`; `agentNamePrefix` must end with `-`.
+Rules: `skillIdPrefix` may not contain `:`; `agentNamePrefix` must end with
+`-`.
 
-## Public API
+## Design principles
 
-`scripts/installer/index.mjs` re-exports the v1 stability contract. Adding new exports is backward-compatible; removing or renaming is a breaking change.
+Why the kernel is shaped this way. Each of these is enforced or recorded, not
+aspirational.
+
+1. **Product-agnostic kernel.** Zero product knowledge; inert without a
+   `ProductConfig`, which throws at `defineProductConfig` — not at first use —
+   when misconfigured. ([ADR-0001](./docs/adr/0001-adopt-adr-practice-and-record-frozen-invariants.md))
+2. **Manifest is the only source of truth.** No manifest entry → the kernel
+   cannot see the asset. There is no implicit filesystem discovery.
+3. **Z three-layer, enforced by test.** `index.mjs` is the only public entry;
+   the layer-direction guard is `architecture.test.mjs`, not convention.
+   ([ADR-0001](./docs/adr/0001-adopt-adr-practice-and-record-frozen-invariants.md))
+
+   ```text
+   scripts/installer/
+   ├── core/      # pure logic; never imports adapters/ or cli/
+   ├── adapters/  # platform integrations; never imports cli/
+   └── cli/       # surface; may import core/ and adapters/
+   ```
+
+4. **Idempotent, state-tracked, drift-aware.** `install` / `update` /
+   `repair` have defined semantics over recorded on-disk state; `repair`
+   re-installs only what drifted from the manifest.
+   ([ADR-0008](./docs/adr/0008-unfreeze-state-dirname-rename-to-nexel.md))
+5. **Decoupling discipline.** npm publication and the public-API contract
+   clock are deliberately decoupled from the name decision and sequenced
+   later — pre-publish internal API churn is cleanup, not a contract break.
+   ([ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md))
+6. **ADR-recorded trade-offs.** Hard-to-reverse, surprising decisions are
+   each recorded as one file in [`docs/adr/`](./docs/adr/).
+
+## Reference
+
+> Lookup material — skim past unless you need a specific export, verb, or
+> flag.
+
+### Public API
+
+`scripts/installer/index.mjs` re-exports the v1 stability contract. Adding new
+exports is backward-compatible; removing or renaming is a breaking change.
 
 | Category | Exports |
 |---|---|
@@ -104,24 +176,11 @@ Rules: `skillIdPrefix` may not contain `:`; `agentNamePrefix` must end with `-`.
 | **Kernel commands** | `install`, `installMulti`, `uninstall`, `uninstallMulti`, `update`, `updateMulti`, `repair`, `exportCommand`, `importCommand`, `listCommand`, `agentsCommand`, `doctorCommand`, `planCommandText`, `planSelection` |
 | **Errors** | `CommandError`, `AdapterError`, `ProductConfigError`, `StateError`, `FsError`, `PlanError`, `CancelledError`, all `ERR_*` codes |
 
-## Architecture
+### Adapter SPI
 
-`nexel` enforces a **Z three-layer** kernel via `architecture.test.mjs`:
-
-```
-scripts/installer/
-├── core/          # Pure logic; never imports from cli/ or adapters/
-├── adapters/      # Platform integrations; never imports from cli/
-└── cli/           # Surface; may import from core/ and adapters/
-```
-
-The public API barrel (`index.mjs`) is the only entry point downstream consumers should touch.
-
-## Adapter SPI
-
-Three built-in adapters ship out of the box: Claude Code, Codex, OpenCode. Downstream products supply additional adapters by passing modules to `createCli({ adapters: [...] })`.
-
-Each adapter exports the following SPI v1 contract:
+Three built-in adapters ship out of the box: Claude Code, Codex, OpenCode.
+Downstream products supply additional adapters via
+`createCli({ adapters: [...] })`. Each adapter exports the SPI v1 contract:
 
 | Field | Required | Type / signature |
 |---|---|---|
@@ -137,9 +196,11 @@ Each adapter exports the following SPI v1 contract:
 | `cliInstallUrl` | no | `string` |
 | `doctorProbes` | no | `({ targetRoot, env, productConfig }) => Array<{ name, ok, detail }>` |
 
-Optional fields are filled with kernel defaults from `SPI_DEFAULTS` when omitted. See [`scripts/installer/adapters/spi.mjs`](./scripts/installer/adapters/spi.mjs) for the canonical contract and [`scripts/installer/adapters/claude.mjs`](./scripts/installer/adapters/claude.mjs) for a complete worked example.
+Optional fields are filled from `SPI_DEFAULTS` when omitted. Canonical
+contract: [`scripts/installer/adapters/spi.mjs`](./scripts/installer/adapters/spi.mjs).
+Complete worked adapter: [`scripts/installer/adapters/claude.mjs`](./scripts/installer/adapters/claude.mjs).
 
-## Verbs
+### Verbs & flags
 
 | Verb | Purpose |
 |---|---|
@@ -156,7 +217,9 @@ Optional fields are filled with kernel defaults from `SPI_DEFAULTS` when omitted
 | `doctor` | Check adapter health and installed-asset integrity |
 | `help` | Print usage (handled in the CLI shell, not dispatched as a kernel verb) |
 
-All verbs accept `--json` for machine-readable output. The following flags apply to the state-mutating verbs (`install`, `uninstall`, `update`, `repair`); `plan` also accepts the selection subset:
+All verbs accept `--json`. The following flags apply to the state-mutating
+verbs (`install`, `uninstall`, `update`, `repair`); `plan` also accepts the
+selection subset:
 
 | Flag | Argument | Purpose |
 |---|---|---|
@@ -172,39 +235,60 @@ All verbs accept `--json` for machine-readable output. The following flags apply
 | `--force` | — | Bypass safety checks |
 | `--accept-modified` | `<relPath>` | Mark a specific file as intentionally modified |
 
-Run `node examples/sample-product/bin.mjs help` for the full reference, dynamically rendered with your `productConfig.binName`. Per-verb usage: `<bin> <verb> --help` or `<bin> help <verb>`.
+Full reference: `node examples/sample-product/bin.mjs help`, dynamically
+rendered with your `productConfig.binName`. Per-verb: `<bin> <verb> --help`
+or `<bin> help <verb>`.
 
-## For LLM Agents
+## For AI agents
 
-Driving a nexel-derived bin programmatically? The product-agnostic behavioral contract — every verb, the exit-code contract, the `--json` envelope shape, the non-interactive flags (`--yes`, `--json`), and the help-affordance rules — is specified in [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md). It is stable kernel surface, independent of any product's bin name or content. [`examples/sample-product/bin.mjs`](./examples/sample-product/) is a runnable instantiation to test against.
+Driving a nexel-derived bin programmatically? The product-agnostic
+behavioral contract — every verb, the exit-code contract, the `--json`
+envelope shape, the non-interactive flags (`--yes`, `--json`), and the
+help-affordance rules — is specified in
+[`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md). It is stable
+kernel surface, independent of any product's bin name or content.
+[`examples/sample-product/bin.mjs`](./examples/sample-product/) is a runnable
+instantiation to test against.
 
-## Tests
+## Project
+
+### Status
+
+Pre-1.0. The name is resolved (`nexel`); npm publication and the public-API
+contract clock are deliberately deferred and decoupled from the name decision
+(see [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md),
+superseding [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)).
+The public surface is still iterating — pin a tag.
+
+### Roadmap
+
+- **Next** — broader test coverage against the sample fixture, locale catalog
+  plug-ins, additional adapter SPI implementations. Distribution stays
+  git-tag / git-dependency / vendor; npm publication remains deferred.
+- **v1.0.0** — when the API has survived ≥ one downstream adopter in
+  production for a full quarter.
+
+### Tests
 
 ```sh
 npm test
 ```
 
-7 test suites covering parser, dispatch, manifest loader, adapter SPI conformance, architecture-layer guards, skill linter, and an end-to-end sample bin smoke test. Individual suites:
+`npm test` runs the full suite; the `test` script in `package.json` is the
+authoritative, always-current list. Coverage is layered: per-module unit
+(`errors`, `asset-types`, `which`, `plan`, `stage-asset`, `manifest`
+loader/validator/drift), adapter conformance (`spi`, `opencode`), CLI surface
+(`argv`, `dispatch`, `lint-skills`, `lint-release-sync`), the Z-layer guard
+(`architecture`), and `examples/sample-product/` end-to-end (`sample-bin`,
+`repair-rehash`).
 
-```sh
-npm run test:lint           # SKILL.md frontmatter validator
-npm run test:loader         # manifest path resolution
-npm run test:argv           # CLI arg parser
-npm run test:dispatch       # verb -> handler dispatch table
-npm run test:spi            # adapter SPI v1 contract
-npm run test:architecture   # Z three-layer dependency guard
-npm run test:sample-bin     # examples/sample-product end-to-end
-```
-
-## Roadmap
-
-- **Next** — the name decision has landed (`nexel`, [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md)); npm publication remains deliberately deferred (decoupled from the name decision, sequenced after the residual coverage sweep); distribution stays git-tag / git-dependency / vendor. Ongoing: broader test coverage against the sample fixture, locale catalog plug-ins, additional adapter SPI implementations
-- **v1.0.0** — when the API has survived ≥ one downstream adopter in production for a full quarter
-
-## License
+### License
 
 MIT — see [LICENSE](./LICENSE).
 
-## Contributing
+### Contributing
 
-Issues and PRs welcome. For non-trivial changes — new adapters, new verbs, public API additions, or architectural shifts — open a GitHub issue first so the direction can be aligned before implementation work starts. Bug fixes, documentation improvements, and additions to the sample fixture can go straight to a PR.
+Issues and PRs welcome. For non-trivial changes — new adapters, new verbs,
+public API additions, or architectural shifts — open a GitHub issue first so
+the direction can be aligned before implementation. Bug fixes, documentation
+improvements, and additions to the sample fixture can go straight to a PR.
