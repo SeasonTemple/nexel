@@ -1,6 +1,6 @@
-# skillctl
+# nexel
 
-The shared language of skillctl — a product-agnostic kernel for installing agent skills, agents, and rules across multiple agent CLIs. Created lazily during a grilling session; extend as terms are resolved.
+The shared language of nexel — a product-agnostic kernel for installing agent skills, agents, and rules across multiple agent CLIs. Created lazily during a grilling session; extend as terms are resolved. (Formerly `skillctl`; renamed per ADR-0007.)
 
 ## Language
 
@@ -33,7 +33,7 @@ _Avoid_: merge, sync, port
 ### Release & contract
 
 **Published baseline**:
-The API surface that exists in an actually-published npm release. skillctl currently has **no published baseline** — the npm name `skillctl` is an unrelated third-party package (versions 0.0.3–0.0.9), and this kernel has never been published under any version.
+The API surface that exists in an actually-published npm release. nexel currently has **no published baseline** — the npm name `skillctl` (this project's former name; see ADR-0007) is an unrelated third-party package (versions 0.0.3–0.0.9), and this kernel has never been published under any version.
 _Avoid_: released version, public version
 
 **Public API contract**:
@@ -41,7 +41,7 @@ The stability promise that begins at the *first real publish under the resolved 
 _Avoid_: the API, the interface
 
 **Release model**:
-Distribution is git tag + `docs/release-notes/v<x.y.z>.md`, consumed via clone / git-dependency / vendor. **Not npm** — npm publication is deferred because the package name may still change; `package.json` carries `"private": true` as the accidental-publish guard.
+Distribution is git tag + `docs/release-notes/v<x.y.z>.md`, consumed via clone / git-dependency / vendor. **Not npm** — npm publication is deferred per ADR-0007 (the name is now resolved to `nexel`, but publish and the public-API contract clock are deliberately decoupled from the name decision and sequenced later); `package.json` carries `"private": true` as the accidental-publish guard.
 _Avoid_: the release process (overloaded with the lint)
 
 ## Relationships
@@ -58,6 +58,6 @@ _Avoid_: the release process (overloaded with the lint)
 
 ## Flagged ambiguities
 
-- **"skillctl" the npm package vs "skillctl" this kernel** — resolved: distinct and unrelated. `npm view skillctl` returns a third-party package ("Gestor de Skills para Agentes de IA", 0.0.3–0.0.9, frozen 2026-02). This repo's kernel is unpublished; the name is provisional and may change. Do not treat the npm registry state as this project's history.
+- **"skillctl" the npm package vs this kernel's former name** — resolved: distinct and unrelated. `npm view skillctl` returns a third-party package ("Gestor de Skills para Agentes de IA", 0.0.3–0.0.9, frozen 2026-02). This repo's kernel is unpublished and is now named `nexel` (ADR-0007 resolved the formerly-provisional name; the npm `skillctl` was never this project). Do not treat the npm registry state as this project's history.
 - **"release process"** was used for both the `lint-release-sync` mechanical check and the distribution model — resolved: the mechanical check is the *release-sync lint*; the distribution/versioning posture is the **Release model**.
 - **"three-platform capability parity"** — unqualified claim is false. An **Agent**'s `tools:` restriction cannot survive the OpenCode transform (OpenCode's validator rejects Claude's frontmatter shape). Resolved: a Claude/Codex-restricted agent runs at OpenCode's default subagent access — a *named, accepted divergence* (ADR-0002 D4), revisitable if OpenCode gains a native restriction field. The kernel claims parity of *capability surface*, not of *per-agent tool restriction on OpenCode*.

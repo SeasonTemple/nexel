@@ -1,8 +1,8 @@
-# skillctl — Kernel CLI Contract for AI Agents
+# nexel — Kernel CLI Contract for AI Agents
 
 This document is the **product-agnostic** behavioral contract for any CLI
-built on the `skillctl` kernel (via `createCli` + a `ProductConfig`). It
-describes what every skillctl-derived bin guarantees so an agent can drive
+built on the `nexel` kernel (via `createCli` + a `ProductConfig`). It
+describes what every nexel-derived bin guarantees so an agent can drive
 it non-interactively without scraping help text or guessing.
 
 It is intentionally **not** a product install guide. Where a verb behaves a
@@ -128,7 +128,7 @@ node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-wor
 node examples/sample-product/bin.mjs install --help
 ```
 
-Its bin name is `sample-installer` — note that `skillctl` never appears in
+Its bin name is `sample-installer` — note that `nexel` never appears in
 its user-facing output. That is the product-agnostic guarantee this
 contract rests on.
 

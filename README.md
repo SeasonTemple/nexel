@@ -1,11 +1,12 @@
 <div align="center">
 
-<img src="./assets/hero-banner.webp" alt="skillctl" width="100%" />
+<img src="./assets/hero-banner.webp" alt="nexel" width="100%" />
 
-# skillctl
+# nexel
 
 **Product-agnostic kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode.**
 
+<!-- npm badge intentionally still references the unrelated third-party `skillctl` package; not renamed in 2a — its disposition belongs to the 2b npm-publish work (ADR-0007). -->
 [![npm version](https://img.shields.io/npm/v/skillctl?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/skillctl)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
@@ -20,9 +21,9 @@
 
 ## Overview
 
-`skillctl` is a kernel library. Downstream products supply a `ProductConfig` plus a manifest, and `skillctl` handles validation, planning, install / uninstall / update, state tracking, drift detection, and multi-adapter dispatch. The library itself is product-agnostic — your product's bin name, skill-id prefix, agent name prefix, manifest filename, and env var namespace all come from `ProductConfig`.
+`nexel` is a kernel library. Downstream products supply a `ProductConfig` plus a manifest, and `nexel` handles validation, planning, install / uninstall / update, state tracking, drift detection, and multi-adapter dispatch. The library itself is product-agnostic — your product's bin name, skill-id prefix, agent name prefix, manifest filename, and env var namespace all come from `ProductConfig`.
 
-> **Status:** v0.3.0 — pre-1.0. Not published to npm yet (the name is held by an unrelated package; see [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)). The public surface is still iterating; pin a tag.
+> **Status:** pre-1.0. Name resolved to `nexel`; not published to npm yet — publish and the public-API contract clock are deliberately decoupled from the name decision and sequenced later (see [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md), which supersedes [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)). The public surface is still iterating; pin a tag.
 
 ## Install
 
@@ -30,12 +31,12 @@ Not on npm. Consume via a pinned git tag — clone, a git dependency, or vendori
 
 ```sh
 # git dependency (package.json), pinned to a release tag
-npm install "git+https://github.com/<owner>/skillctl.git#v0.3.0"
+npm install "git+https://github.com/<owner>/nexel.git#v0.3.0"
 ```
 
 ```sh
 # or clone + pin
-git clone https://github.com/<owner>/skillctl.git && cd skillctl && git checkout v0.3.0
+git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.3.0
 ```
 
 Release notes per tag live in [`docs/release-notes/`](./docs/release-notes/). Requires Node ≥ 18. ESM only.
@@ -61,14 +62,14 @@ node examples/sample-product/bin.mjs list --json
 node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-world
 ```
 
-The bin is branded with whatever `productConfig.binName` you set. `skillctl` itself never appears in user-facing text once wired up.
+The bin is branded with whatever `productConfig.binName` you set. `nexel` itself never appears in user-facing text once wired up.
 
 ## ProductConfig
 
 `defineProductConfig({...})` is the only product-identity surface. Required fields fail loud at construction time:
 
 ```js
-import { defineProductConfig } from "skillctl";
+import { defineProductConfig } from "nexel";
 
 export default defineProductConfig({
   productName: "my-skills",
@@ -107,7 +108,7 @@ Rules: `skillIdPrefix` may not contain `:`; `agentNamePrefix` must end with `-`.
 
 ## Architecture
 
-`skillctl` enforces a **Z three-layer** kernel via `architecture.test.mjs`:
+`nexel` enforces a **Z three-layer** kernel via `architecture.test.mjs`:
 
 ```
 scripts/installer/
@@ -177,7 +178,7 @@ Run `node examples/sample-product/bin.mjs help` for the full reference, dynamica
 
 ## For LLM Agents
 
-Driving a skillctl-derived bin programmatically? The product-agnostic behavioral contract — every verb, the exit-code contract, the `--json` envelope shape, the non-interactive flags (`--yes`, `--json`), and the help-affordance rules — is specified in [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md). It is stable kernel surface, independent of any product's bin name or content. [`examples/sample-product/bin.mjs`](./examples/sample-product/) is a runnable instantiation to test against.
+Driving a nexel-derived bin programmatically? The product-agnostic behavioral contract — every verb, the exit-code contract, the `--json` envelope shape, the non-interactive flags (`--yes`, `--json`), and the help-affordance rules — is specified in [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md). It is stable kernel surface, independent of any product's bin name or content. [`examples/sample-product/bin.mjs`](./examples/sample-product/) is a runnable instantiation to test against.
 
 ## Tests
 
@@ -199,7 +200,7 @@ npm run test:sample-bin     # examples/sample-product end-to-end
 
 ## Roadmap
 
-- **Next** — npm publication remains deferred until the name + publish decision lands ([ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)); distribution stays git-tag / git-dependency / vendor. Ongoing: broader test coverage against the sample fixture, locale catalog plug-ins, additional adapter SPI implementations
+- **Next** — the name decision has landed (`nexel`, [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md)); npm publication remains deliberately deferred (decoupled from the name decision, sequenced after the residual coverage sweep); distribution stays git-tag / git-dependency / vendor. Ongoing: broader test coverage against the sample fixture, locale catalog plug-ins, additional adapter SPI implementations
 - **v1.0.0** — when the API has survived ≥ one downstream adopter in production for a full quarter
 
 ## License

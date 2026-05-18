@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# skillctl repo pre-commit: release-sync lint + the full test suite. The
+# nexel repo pre-commit: release-sync lint + the full test suite. The
 # repo no longer ships a top-level skill catalog, so lint:skills /
 # lint:manifest / lint:drift only apply when a downstream product wires
 # them up — they are not run here. lint:release-sync IS repo-level (it

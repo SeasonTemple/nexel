@@ -4,7 +4,7 @@ Guidance for Claude Code (and any agent) working in this repo.
 
 ## What this repo is
 
-`skillctl` — an OSS kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode. The library is product-agnostic; downstream products supply a `ProductConfig` and content, and the kernel handles install / uninstall / update / state tracking / drift detection / planning / etc.
+`nexel` — an OSS kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode. The library is product-agnostic; downstream products supply a `ProductConfig` and content, and the kernel handles install / uninstall / update / state tracking / drift detection / planning / etc. (Formerly `skillctl`; renamed per `docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md`.)
 
 The repo previously hosted Lenovo's internal NetOps team-skills product. The OSS line forked at v0.5.1 of that internal product, dropped all internal content, and restarted at v0.1.0. The internal product line is no longer present in this repository — only the kernel library and a single worked example under `examples/sample-product/`.
 
@@ -19,7 +19,7 @@ Installs `yaml` + `husky` (auto-activated via the `prepare` script). Run once af
 ## Repository layout
 
 ```
-skillctl/
+nexel/
 ├── scripts/
 │   ├── installer/          # The kernel library — Z three-layer
 │   │   ├── core/           # Pure logic: manifest, validator, plan, state, stage-asset
@@ -89,7 +89,7 @@ The legacy-product-coupled tests dropped during the OSS strip were rebuilt again
    ```
 2. Register the skill in the product's `install.json` manifest
 3. Run the product's bin: `<binName> validate <path-to-SKILL.md>` to lint a single file, or `<binName> list` to confirm the manifest sees it
-4. Commit — pre-commit hook in this skillctl repo runs `npm test`; downstream products configure their own hooks
+4. Commit — pre-commit hook in this nexel repo runs `npm test`; downstream products configure their own hooks
 
 ## Frontmatter category enum (lint default)
 

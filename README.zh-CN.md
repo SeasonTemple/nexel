@@ -1,11 +1,12 @@
 <div align="center">
 
-<img src="./assets/hero-banner.webp" alt="skillctl" width="100%" />
+<img src="./assets/hero-banner.webp" alt="nexel" width="100%" />
 
-# skillctl
+# nexel
 
 **通用 Agent 技能管理内核库 — 统一管理 Claude Code、Codex、OpenCode 上的 skills/agents/rules。**
 
+<!-- npm badge 有意仍指向无关的第三方 `skillctl` 包；2a 不改名 —— 其去留属 2b npm 发布工作（ADR-0007）。 -->
 [![npm version](https://img.shields.io/npm/v/skillctl?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/skillctl)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
@@ -20,9 +21,9 @@
 
 ## 概述
 
-`skillctl` 是内核库。下游产品提供 `ProductConfig` 与 manifest，由 `skillctl` 负责校验、规划、安装/卸载/更新、状态追踪、drift 检测和多 adapter 分发。库自身完全产品无关 — bin 名、skill id 前缀、agent name 前缀、manifest 文件名、env var 命名空间，全部由 `ProductConfig` 注入。
+`nexel` 是内核库。下游产品提供 `ProductConfig` 与 manifest，由 `nexel` 负责校验、规划、安装/卸载/更新、状态追踪、drift 检测和多 adapter 分发。库自身完全产品无关 — bin 名、skill id 前缀、agent name 前缀、manifest 文件名、env var 命名空间，全部由 `ProductConfig` 注入。
 
-> **当前版本：** v0.3.0 — 1.0 之前。尚未发布到 npm（该名被一个无关包占用，见 [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)）。公共表面仍在迭代，请锁定 tag。
+> **状态：** 1.0 之前。名称已定为 `nexel`；尚未发布 npm —— 发布与 public-API contract clock 已刻意与命名决策解耦并延后（见 [ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md)，取代 [ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)）。公共表面仍在迭代，请锁定 tag。
 
 ## 安装
 
@@ -30,12 +31,12 @@
 
 ```sh
 # git 依赖（package.json），锁定到发布 tag
-npm install "git+https://github.com/<owner>/skillctl.git#v0.3.0"
+npm install "git+https://github.com/<owner>/nexel.git#v0.3.0"
 ```
 
 ```sh
 # 或 clone + 锁定 tag
-git clone https://github.com/<owner>/skillctl.git && cd skillctl && git checkout v0.3.0
+git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.3.0
 ```
 
 每个 tag 的发布说明见 [`docs/release-notes/`](./docs/release-notes/)。依赖 Node ≥ 18，仅 ESM。
@@ -61,14 +62,14 @@ node examples/sample-product/bin.mjs list --json
 node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-world
 ```
 
-bin 输出的品牌名取决于你在 `productConfig.binName` 里设的值。一旦接入,`skillctl` 自身不会出现在任何 user-facing 文本里。
+bin 输出的品牌名取决于你在 `productConfig.binName` 里设的值。一旦接入,`nexel` 自身不会出现在任何 user-facing 文本里。
 
 ## ProductConfig
 
 `defineProductConfig({...})` 是产品身份的唯一注入点。必填字段在构造期硬性校验:
 
 ```js
-import { defineProductConfig } from "skillctl";
+import { defineProductConfig } from "nexel";
 
 export default defineProductConfig({
   productName: "my-skills",
@@ -107,7 +108,7 @@ export default defineProductConfig({
 
 ## 架构
 
-`skillctl` 通过 `architecture.test.mjs` 强制 **Z 三层** 内核结构:
+`nexel` 通过 `architecture.test.mjs` 强制 **Z 三层** 内核结构:
 
 ```
 scripts/installer/
@@ -177,7 +178,7 @@ Public API 桶 (`index.mjs`) 是下游唯一应该触碰的入口。
 
 ## 给 LLM Agent
 
-需要程序化驱动 skillctl 衍生 bin？产品无关的行为契约 —— 每个 verb、退出码契约、`--json` envelope 形态、非交互 flag（`--yes`、`--json`）、help 可发现性规则 —— 规范在 [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md)。它是稳定的 kernel 表面，与任何产品的 bin 名称或内容无关。[`examples/sample-product/bin.mjs`](./examples/sample-product/) 是可直接运行的实例，用于对照测试。
+需要程序化驱动 nexel 衍生 bin？产品无关的行为契约 —— 每个 verb、退出码契约、`--json` envelope 形态、非交互 flag（`--yes`、`--json`）、help 可发现性规则 —— 规范在 [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md)。它是稳定的 kernel 表面，与任何产品的 bin 名称或内容无关。[`examples/sample-product/bin.mjs`](./examples/sample-product/) 是可直接运行的实例，用于对照测试。
 
 ## 测试
 
@@ -199,7 +200,7 @@ npm run test:sample-bin     # examples/sample-product 端到端
 
 ## Roadmap
 
-- **后续** — npm 发布仍推迟至名称 + 发布决策落定（[ADR-0005](./docs/adr/0005-release-model-no-npm-provisional-name.md)）；分发维持 git-tag / git 依赖 / vendor。进行中：基于 sample fixture 扩充测试覆盖、locale 目录插件、更多 Adapter SPI 实现
+- **后续** — 命名决策已落定（`nexel`，[ADR-0007](./docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md)）；npm 发布仍刻意延后（与命名决策解耦，排在残余覆盖 sweep 之后）；分发维持 git-tag / git 依赖 / vendor。进行中：基于 sample fixture 扩充测试覆盖、locale 目录插件、更多 Adapter SPI 实现
 - **v1.0.0** — API 在生产环境经过至少一个外部 adopter 一个 quarter 稳定运行后触发
 
 ## License
