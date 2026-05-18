@@ -1,7 +1,7 @@
 ---
 title: "feat: Candidate 1 — post-v0.4.0 residual test-coverage sweep"
 type: feat
-status: active
+status: completed
 date: 2026-05-18
 origin: docs/brainstorms/2026-05-18-rename-skillctl-to-nexel-requirements.md
 ---
