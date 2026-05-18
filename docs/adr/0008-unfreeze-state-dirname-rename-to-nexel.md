@@ -85,8 +85,13 @@ narrow amendment, not a re-opening of the rename or publish decisions.
 - The contract clock is still **not** started (ADR-0007 D5 stands). This change
   is pre-publish routine cleanup, recorded in the `v0.5.2` release note for
   git-tag/vendor consumers.
-- ADR-0007 stays on file as a historical record; D4 is marked superseded by
-  this ADR (the rest of 0007 remains authoritative).
+- ADR-0007 stays on file **verbatim** as a historical record — it is NOT
+  annotated. Per the repo's supersession convention the *superseding* ADR
+  carries the forward pointer (exactly as ADR-0007 itself did for ADR-0005,
+  which was likewise left unmarked). D4 is superseded by this ADR; the rest
+  of ADR-0007 remains authoritative. A reader on ADR-0007 D4 reaches this
+  ADR via the ADR index / the `supersedes:` frontmatter here, not via an
+  in-place marker on 0007.
 
 ## References
 

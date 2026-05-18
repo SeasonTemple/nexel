@@ -21,7 +21,7 @@ import {
   getRepoCommit,
 } from "./index.mjs";
 import { loadManifest } from "../../core/manifest/loader.mjs";
-import { readState } from "../../core/filesystem.mjs";
+import { readState, STATE_DIRNAME } from "../../core/filesystem.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../../../..");
@@ -405,4 +405,15 @@ test("repair --apply: tampered file without --accept-modified is reported in ski
     assert.match(r.message, /tampered file\(s\) not repaired; pass --accept-modified <relPath> per file/);
     assert.equal(fs.readFileSync(abs, "utf8"), tamperedBytes, "tampered file left untouched without accept-modified");
   } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+// --- STATE_DIRNAME value guard (ADR-0008 / plan 2026-05-18-006) ---
+// The .skillctl→.nexel rename is a DELIBERATE breaking on-disk-contract
+// change. Without this assertion the rename is only protected by
+// self-consistency of the stateDirFor indirection — a typo'd or reverted
+// constant would keep the whole suite green (the writer and reader share
+// the constant). This locks the intended on-disk name explicitly.
+test("STATE_DIRNAME is .nexel (locks the deliberate ADR-0008 rename)", () => {
+  assert.equal(STATE_DIRNAME, ".nexel");
+  assert.notEqual(STATE_DIRNAME, ".skillctl", "must not regress to the pre-rename name");
 });
