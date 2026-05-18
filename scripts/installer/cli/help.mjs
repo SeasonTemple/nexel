@@ -9,6 +9,24 @@
 import { strings } from "./strings.mjs";
 
 /**
+ * Map a productConfig + adapter list to the identity params every
+ * strings.help renderer takes. Single source of the adapter-list
+ * delimiter so a verb block and the composed full body can never
+ * disagree on it.
+ *
+ * @param {Object} productConfig
+ * @param {string[]} adapters
+ * @returns {{ binName: string, prefix: string, adapterList: string }}
+ */
+function renderParams(productConfig, adapters) {
+  return {
+    binName: productConfig.binName,
+    prefix: productConfig.skillIdPrefix,
+    adapterList: adapters.join(" | "),
+  };
+}
+
+/**
  * Print the help text to stdout (or a supplied stream).
  *
  * @param {Object} options
@@ -18,9 +36,7 @@ import { strings } from "./strings.mjs";
  * @param {NodeJS.WriteStream} [options.stream=process.stdout]
  */
 export function printHelp({ productConfig, version, adapters, stream = process.stdout }) {
-  const binName = productConfig.binName;
-  const prefix = productConfig.skillIdPrefix;
-  const adapterList = adapters.join(" | ");
+  const { binName, prefix, adapterList } = renderParams(productConfig, adapters);
   const envProfile = productConfig.envProfile || "<envProfile>";
   const envBannerTitle = productConfig.envBannerTitle || "<envBannerTitle>";
 
@@ -71,11 +87,7 @@ export function hasVerbHelp(verb) {
 function printVerbHelp({ verb, productConfig, adapters, stream = process.stdout }) {
   const render = strings.help.verb?.[verb];
   if (typeof render !== "function") return;
-  stream.write(render({
-    binName: productConfig.binName,
-    prefix: productConfig.skillIdPrefix,
-    adapterList: adapters.join(" | "),
-  }));
+  stream.write(render(renderParams(productConfig, adapters)));
 }
 
 /**
