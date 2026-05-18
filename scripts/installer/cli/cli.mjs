@@ -20,7 +20,7 @@ import { ProductConfigError } from "../core/errors.mjs";
 import { ERR_MISSING_PRODUCT_CONFIG } from "../core/errors.mjs";
 import { createAdapterRegistry } from "../adapters/index.mjs";
 import { parseArgs } from "./argv.mjs";
-import { printHelp } from "./help.mjs";
+import { printHelp, renderHelp } from "./help.mjs";
 import { handleError } from "./error-format.mjs";
 import { dispatchVerb, KERNEL_HANDLERS } from "./dispatch.mjs";
 import { CancelledError } from "./prompts.mjs";
@@ -82,7 +82,11 @@ export function createCli({
       }
       const args = parseArgs(argv, { validVerbs: verbs });
       if (args.help || args.verb === "help") {
-        printHelp({ productConfig, version: ctx.version, adapters: adapterIds });
+        // No stream passed — renderHelp's stream=process.stdout default
+        // resolves it. Verb-scoped (`<verb> --help`, `help <verb>`) routes
+        // to a focused block; everything else falls back to the unchanged
+        // composed full body.
+        renderHelp({ args, productConfig, version: ctx.version, adapters: adapterIds });
         process.exit(0);
       }
       if (args.profile && productConfig.envProfile) {

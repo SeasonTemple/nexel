@@ -11,7 +11,7 @@
 // ---------- createCli factory (public entry for npm consumers) ----------
 export { createCli } from "./cli/cli.mjs";
 export { parseArgs } from "./cli/argv.mjs";
-export { printHelp } from "./cli/help.mjs";
+export { printHelp, renderHelp } from "./cli/help.mjs";
 export { handleError, formatSkipNote } from "./cli/error-format.mjs";
 export {
   resolveSelections,
