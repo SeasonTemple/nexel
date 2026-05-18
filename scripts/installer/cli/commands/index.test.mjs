@@ -372,3 +372,37 @@ test("updateMulti: okCount path reachable via PATH-stub (updateMulti has no allo
     assert.equal(r.okCount, 2);
   } finally { m.cleanup(); }
 });
+
+// --- uninstall/repair residual branches (plan 2026-05-18-005 U3) ---
+// missing-on-disk recopy is already covered by "repair --apply: restores a
+// deleted managed file" above — NOT duplicated here (origin R7 "extend,
+// do not duplicate"). U3 covers only the genuinely-uncovered residuals.
+
+test("uninstall: never-installed selection (state exists) → ERR_NOT_INSTALLED", async () => {
+  const target = tmp("u3-noti-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    await assert.rejects(
+      () => uninstall(base({ target, selectionIds: ["sample:demo-bundle-skill"], yes: true })),
+      (e) => e?.code === "ERR_NOT_INSTALLED" && /selection not installed: sample:demo-bundle-skill/.test(e.message),
+      "uninstalling a selection that was never installed (state present) must throw ERR_NOT_INSTALLED",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("repair --apply: tampered file without --accept-modified is reported in skippedTampered, not overwritten", async () => {
+  const target = tmp("u3-tamp-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const rel = readState(target).managedFiles[0].relPath;
+    const abs = path.join(target, rel);
+    fs.appendFileSync(abs, "\nTAMPERED\n");
+    const tamperedBytes = fs.readFileSync(abs, "utf8");
+    const r = await repair(base({ target, apply: true, acceptModified: [] }));
+    assert.equal(r.ok, true);
+    assert.equal(r.applied, false, "nothing recopied — the only drift is a non-accepted tamper");
+    assert.ok(r.skippedTampered.includes(rel), "tampered relPath surfaced in skippedTampered");
+    assert.match(r.message, /tampered file\(s\) not repaired; pass --accept-modified <relPath> per file/);
+    assert.equal(fs.readFileSync(abs, "utf8"), tamperedBytes, "tampered file left untouched without accept-modified");
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
