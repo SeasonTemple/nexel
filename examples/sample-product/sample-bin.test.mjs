@@ -86,3 +86,29 @@ test("sample bin: --json envelope on error (no manifest)", () => {
   const out = JSON.parse(result.stdout);
   assert.equal(out.skills.length, 2);
 });
+
+// --- Verb-scoped help E2E (U4): the only layer that proves routing
+// reaches a real createCli-wrapped bin and that `<verb> help`
+// reverse-order is NOT a help affordance (the cli.mjs gate is
+// untestable from the help.mjs unit suite). ---
+
+test("sample bin: `install --help` renders the verb-scoped block, not the full table", () => {
+  const r = runBin(["install", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /^sample-installer install — install selected skills\/bundles/);
+  assert.match(r.stdout, /Run 'sample-installer help' for the complete reference\./);
+  assert.ok(!r.stdout.includes("Common flags:"), "verb help must not emit the full flag table");
+});
+
+test("sample bin: `install help` (reverse order) dispatches the install handler, NOT verb help", () => {
+  const r = runBin(["install", "help"]);
+  // `help` is a positional arg to the `install` verb — the cli.mjs help
+  // gate (args.verb==="install", args.help===false) is false, so the
+  // request reaches runInstall, which rejects with no selection.
+  assert.notEqual(r.code, 0, "must run the install handler (which errors), not print help");
+  assert.ok(
+    !r.stdout.includes("sample-installer install — install selected"),
+    "must NOT render the verb-help block",
+  );
+  assert.match(r.stderr, /ERR_NO_SELECTION/);
+});
