@@ -17,14 +17,21 @@ import {
 // CANCEL token and a matching isCancel.
 const CANCEL = Symbol("cancel");
 function stub(overrides = {}) {
+  // Capture arrays live on the returned instance (not the stub function
+  // object) so each stub() is a self-contained spy — no cross-test
+  // accumulation regardless of test order/concurrency.
+  const introCalls = [];
+  const errCalls = [];
   return {
     select: async () => overrides.select ?? "install",
     multiselect: async () => overrides.multiselect ?? [],
     isCancel: (v) => v === CANCEL,
-    intro: (...a) => { (stub._intro ??= []).push(a[0]); },
+    intro: (...a) => { introCalls.push(a[0]); },
     outro: () => {},
-    log: { error: (...a) => { (stub._err ??= []).push(a[0]); }, info: () => {}, warn: () => {} },
+    log: { error: (...a) => { errCalls.push(a[0]); }, info: () => {}, warn: () => {} },
     note: () => {},
+    _intro: introCalls,
+    _err: errCalls,
     ...overrides.extra,
   };
 }
@@ -112,8 +119,7 @@ test("gatherUninstallChoices: adapter multiselect cancel → CancelledError('uni
 // --- gatherInstallChoices: intro hygiene (R7) ---
 
 test("gatherInstallChoices: intro text is product-agnostic — no NetOps literal (R7 hygiene)", async () => {
-  stub._intro = [];
-  const p = stub({ select: "by-category", multiselect: [] });
+  const p = stub();
   // Drive only far enough to exercise the intro() call; a cancel right
   // after keeps the test from depending on the full picker flow.
   p.select = async () => CANCEL;
@@ -124,9 +130,27 @@ test("gatherInstallChoices: intro text is product-agnostic — no NetOps literal
       adapters: [{ id: "claude-code", displayName: "Claude", targetRoot: "/tmp/x", supportsDirect: true }],
     });
   } catch { /* cancel/whatever — we only assert the intro literal */ }
-  const intros = (stub._intro || []).join(" ");
+  const intros = p._intro.join(" ");
   assert.ok(intros.length > 0, "intro was called");
   assert.ok(!/NetOps|netops/.test(intros), `intro must not embed a NetOps literal: ${intros}`);
+});
+
+test("gatherInstallChoices: plugin-mode happy path returns {mode,adapterId,instructions}", async () => {
+  // plugin mode is the deterministic happy path: select→'plugin', then
+  // select→adapter id; returns the adapter's plugin install instructions.
+  const p = stub();
+  const seq = ["plugin", "claude-code"];
+  let i = 0;
+  p.select = async () => seq[i++];
+  const r = await gatherInstallChoices({
+    manifest: { skills: [], bundles: [] },
+    prompts: p,
+    adapters: [{ id: "claude-code", displayName: "Claude", supportsDirect: true }],
+  });
+  assert.equal(r.mode, "plugin");
+  assert.equal(r.adapterId, "claude-code");
+  assert.equal(typeof r.instructions, "string");
+  assert.ok(r.instructions.length > 0, "plugin install instructions returned");
 });
 
 // --- CancelledError shape ---

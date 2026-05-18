@@ -40,7 +40,7 @@ superseded deferral.
 | netops four-manifest version lockstep (`marketplace.json` + `plugin.json` ×2) | skillctl ships no plugin manifests — nothing to lockstep |
 | `INSTALL-FOR-AGENTS.md` content, the "version-agnostic explainer" invariant | netops-specific product/agent-install contract, not kernel |
 | `verify-baseline.mjs` byte-baseline oracle | Tier-2-deferred: coupled to a fixed command list + bin name; lower value pre-CLI-stability. Follow-up |
-| Product-coupled test rebuild (extended `loader`/`commands`/`cli`/`help`/`strings`/`prompts`) | Deferred to a follow-up sweep as the sample fixture stabilizes (CLAUDE.md commitment) |
+| Product-coupled test rebuild (extended `loader`/`commands`/`cli`/`help`/`strings`/`prompts`) | **Discharged v0.4.0** (`help`/`error-format` earlier in v0.3.0/v0.3.1; see `docs/release-notes/v0.4.0.md` and `docs/plans/2026-05-18-003-...`). Two narrow items remain deferred: a typed-error loader layer and `renderNextSteps`' product-specific bin-path literal. |
 
 ### Recorded deviations from the netops blueprint
 

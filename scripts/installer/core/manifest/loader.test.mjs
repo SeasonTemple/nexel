@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { defaultManifestPath, defaultPaths, stripBom, loadManifest } from "./loader.mjs";
 
 const REPO_ROOT = "/repo";
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 test("stripBom: removes leading BOM", () => {
   assert.equal(stripBom("﻿hello"), "hello");
@@ -104,12 +108,6 @@ test("loadManifest: parses JSON + strips BOM", async () => {
 // type. These cases pin the loader's ACTUAL contract (asserting reality,
 // not an imposed expectation); a typed-error loader layer is a layering
 // decision flagged to Deferred-to-Follow-Up, out of this test sweep. ---
-
-import fs from "node:fs";
-import os from "node:os";
-import { fileURLToPath } from "node:url";
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 function withTmp(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ldr-ext-"));

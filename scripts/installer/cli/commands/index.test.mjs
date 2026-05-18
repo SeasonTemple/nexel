@@ -76,8 +76,8 @@ test("install: empty selection throws ERR_NO_SELECTION (correct behavior)", asyn
   try {
     await assert.rejects(
       () => install(base({ target, selectionIds: [] })),
-      (e) => e?.code === "ERR_NO_SELECTION" || /selection/i.test(e?.message),
-      "empty selection must be rejected, not silently succeed",
+      (e) => e?.code === "ERR_NO_SELECTION",
+      "empty selection must be rejected with ERR_NO_SELECTION, not silently succeed",
     );
   } finally { fs.rmSync(target, { recursive: true, force: true }); }
 });
@@ -153,9 +153,11 @@ test("agentsCommand: reports the built-in adapter targets", () => {
     "all three built-in adapters reported");
 });
 
-test("doctorCommand: returns a structured health report", () => {
+test("doctorCommand: returns a structured health report with reports + counts", () => {
   const out = doctorCommand({ repoRoot: SAMPLE, adapterId: "claude-code", env: process.env });
-  assert.ok(out && typeof out === "object", "doctor returns a report object");
+  assert.ok(Array.isArray(out.reports), "reports is an array");
+  assert.equal(typeof out.okCount, "number", "okCount is numeric");
+  assert.equal(typeof out.failCount, "number", "failCount is numeric");
 });
 
 test("export -> import round-trips the installed selection set", async () => {
@@ -196,4 +198,84 @@ test("getRepoCommit: in-repo returns a 40-hex sha; non-git cwd returns null", ()
   try {
     assert.equal(getRepoCommit(nongit), null, "non-git cwd → catch→null");
   } finally { fs.rmSync(nongit, { recursive: true, force: true }); }
+});
+
+// --- plan 003 U1 committed-scope error/failure paths (added per
+// Tier-2 ce-code-review: the focused suite skipped these explicitly
+// enumerated R1 scenarios). ---
+
+test("install: unmanaged target-file conflict blocks; overwriteUnmanaged bypasses", async () => {
+  const target = tmp("u1-ovr-");
+  try {
+    // Establish the real install rel-path, then make it an UNMANAGED file
+    // (file present, no managing state) to trigger the conflict branch.
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const rel = readState(target).managedFiles[0].relPath;
+    await uninstall(base({ target, selectionIds: ["sample:hello-world"], yes: true }));
+    fs.mkdirSync(path.dirname(path.join(target, rel)), { recursive: true });
+    fs.writeFileSync(path.join(target, rel), "unmanaged pre-existing content\n");
+
+    const blocked = await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    assert.equal(blocked.ok, false, "unmanaged file must block install");
+    assert.equal(blocked.reason, "unmanaged-files-block");
+
+    const forced = await install(base({ target, selectionIds: ["sample:hello-world"], overwriteUnmanaged: true }));
+    assert.equal(forced.ok, true, "overwriteUnmanaged must bypass the conflict");
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("update: source-drifted + locally-edited managed file blocks (modification-blocks)", async () => {
+  // update() only acts when the SOURCE changed; the tamper-block fires
+  // when a refresh WOULD clobber a locally-edited on-disk file. So this
+  // needs a writable fixture copy (drift the source there) — editing
+  // only the on-disk target with an unchanged source is a correct no-op,
+  // not a block (verified). Mirrors repair-rehash.test.mjs's setup.
+  const fixture = tmp("u1-updfx-");
+  const target = tmp("u1-updblk-");
+  try {
+    for (const e of ["sample.install.json", "skills", "agents", "rules"]) {
+      fs.cpSync(path.join(SAMPLE, e), path.join(fixture, e), { recursive: true });
+    }
+    const fixManifest = loadManifest(path.join(fixture, "sample.install.json"));
+    const fb = (x) => ({ repoRoot: fixture, adapterId: "claude-code", productConfig, manifest: fixManifest, installerVersion: "test", allowNoCli: true, env: process.env, ...x });
+    await install(fb({ target, selectionIds: ["sample:hello-world"] }));
+    const mf = readState(target).managedFiles[0];
+    // Drift the SOURCE so update wants to refresh, AND locally edit the
+    // on-disk file so the refresh would clobber a local edit → block.
+    fs.appendFileSync(path.join(fixture, mf.sourceRelPath), "\n<!-- source drift -->\n");
+    fs.appendFileSync(path.join(target, mf.relPath), "\nlocal edit\n");
+    const r = await update(fb({ target }));
+    assert.equal(r.ok, false, "source-drifted + locally-edited file must block update");
+    assert.equal(r.reason, "modification-blocks");
+    assert.ok(Array.isArray(r.blockedByModification) && r.blockedByModification.length >= 1,
+      "blockedByModification names the edited file");
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("uninstall: --force + --accept-modified bypasses the hash-mismatch block", async () => {
+  const target = tmp("u1-fbyp-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const rel = readState(target).managedFiles[0].relPath;
+    const abs = path.join(target, rel);
+    fs.appendFileSync(abs, "\nedited\n");
+    // Without force → blocked (the existing block test covers ok:false).
+    const forced = await uninstall(base({ target, selectionIds: ["sample:hello-world"], yes: true, force: true, acceptModified: [rel] }));
+    assert.equal(forced.ok, true, "force + accept-modified must bypass the block");
+    assert.ok(!fs.existsSync(abs), "forced uninstall removes the edited file");
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("importCommand: malformed envelope (bad schemaVersion) throws ERR_SCHEMA", async () => {
+  const target = tmp("u1-imperr-");
+  try {
+    await assert.rejects(
+      () => importCommand(base({ target, envelope: { schemaVersion: 99, selections: [] }, yes: true })),
+      (e) => e?.code === "ERR_SCHEMA",
+      "a bad-schema import envelope must be rejected with ERR_SCHEMA",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
 });

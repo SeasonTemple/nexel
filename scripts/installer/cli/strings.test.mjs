@@ -25,7 +25,7 @@ const PARAMS = {
   dirname: "x", target: "/tmp/t", severity: "error", oldSha: "0".repeat(40),
   newSha: "1".repeat(40), recorded: "0".repeat(40), onDisk: "1".repeat(40),
   tamperedFlag: "", sourceNote: "n", sourceCommit: "abc1234", skipNote: "",
-  displayName: "Stub", sym: "✓", name: "check", adapterList: "a | b",
+  displayName: "Stub", sym: "✓", name: "check",
 };
 
 const PRODUCT_LITERAL = /\b(skillctl|netops)\b/i;

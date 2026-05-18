@@ -128,11 +128,18 @@ test("sample bin: `install help` (reverse order) dispatches the install handler,
 // Spawn is the only honest exit-code/branch coverage for process.exit
 // code (no in-process unit path; refactor is out of scope). ---
 
-test("run: list/agents/plan emit parseable --json envelopes, exit 0", () => {
-  for (const verb of [["list"], ["agents"], ["plan", "--agent", "codex", "--skill", "sample:hello-world"]]) {
+test("run: list/agents/plan emit shaped --json envelopes, exit 0", () => {
+  const cases = [
+    { verb: ["list"], shape: (o) => Array.isArray(o.skills) && Array.isArray(o.bundles) },
+    { verb: ["agents"], shape: (o) => Array.isArray(o.adapters ?? o.agents ?? o) },
+    { verb: ["plan", "--agent", "codex", "--skill", "sample:hello-world"], shape: (o) => o && (o.plan || o.targetRoot || Array.isArray(o.assets)) },
+  ];
+  for (const { verb, shape } of cases) {
     const r = runBin([...verb, "--json"]);
     assert.equal(r.code, 0, `${verb[0]} --json exit 0: ${r.stderr}`);
-    assert.doesNotThrow(() => JSON.parse(r.stdout), `${verb[0]} --json is parseable`);
+    let parsed;
+    assert.doesNotThrow(() => { parsed = JSON.parse(r.stdout); }, `${verb[0]} --json is parseable`);
+    assert.ok(shape(parsed), `${verb[0]} --json envelope has the expected shape, got: ${JSON.stringify(parsed).slice(0, 120)}`);
   }
 });
 
@@ -171,8 +178,9 @@ test("run: install with no selection → uniform --json error envelope on stdout
 
 test("run: --target combined with multiple --agent is rejected (exit 2)", () => {
   const r = runBin(["install", "--target", "/tmp/u3-x", "--agent", "codex", "--agent", "claude-code", "--skill", "sample:hello-world", "-y"]);
-  assert.notEqual(r.code, 0, "multi-agent + --target must not succeed");
-  assert.match(`${r.stdout}${r.stderr}`, /--target cannot be combined with multiple --agent|multi/i);
+  assert.equal(r.code, 2, "multi-agent + --target is a precondition failure (exit 2)");
+  assert.match(`${r.stdout}${r.stderr}`, /--target cannot be combined with multiple --agent/,
+    "the exact conflict message, not a loose 'multi' match");
 });
 
 test("run: unknown verb falls through to full help, exit 0", () => {
