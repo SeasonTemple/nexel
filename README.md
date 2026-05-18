@@ -11,7 +11,7 @@
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
 [![Tests](https://img.shields.io/badge/tests-253%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
-[English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Getting started](#getting-started) · [Core model](#core-model) · [Reference](#reference) · [AI agents](#for-ai-agents) · [Examples](./examples/sample-product/)
+[English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Getting started](#getting-started) · [Core model](#core-model) · [Reference](#reference) · [Agent contract](#agent-cli-contract) · [Examples](./examples/sample-product/)
 
 </div>
 
@@ -52,8 +52,8 @@ through `ProductConfig`. Supporting an additional CLI is an adapter, not a
 rewrite.
 
 > Agents driving a nexel-derived bin, rather than authoring one, should refer
-> to [For AI agents](#for-ai-agents): the behavioral contract is specified
-> separately and is stable kernel surface.
+> to the [Agent CLI contract](#agent-cli-contract): the behavioral contract
+> is specified separately and is stable kernel surface.
 
 ## Getting started
 
@@ -105,7 +105,7 @@ Any nexel-derived bin is non-interactive and machine-driveable: every verb
 accepts `--json` (a structured stdout envelope), `--yes` skips prompts, and
 the exit-code contract is stable. The full product-agnostic behavioral
 contract is [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md),
-detailed under [For AI agents](#for-ai-agents).
+detailed in the [Agent CLI contract](#agent-cli-contract) section.
 
 ## Core model
 
@@ -274,7 +274,7 @@ Full reference: `node examples/sample-product/bin.mjs help`, rendered
 dynamically from `productConfig.binName`. Per-verb: `<bin> <verb> --help`
 or `<bin> help <verb>`.
 
-## For AI agents
+## Agent CLI contract
 
 The product-agnostic behavioral contract for driving a nexel-derived bin
 programmatically — every verb, the exit-code contract, the `--json`
