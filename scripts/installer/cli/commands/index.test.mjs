@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   install, uninstall, update, repair,
+  installMulti, updateMulti, uninstallMulti,
   listCommand, agentsCommand, doctorCommand,
   exportCommand, importCommand, planSelection, planCommandText,
   getRepoCommit,
@@ -278,4 +279,96 @@ test("importCommand: malformed envelope (bad schemaVersion) throws ERR_SCHEMA", 
       "a bad-schema import envelope must be rejected with ERR_SCHEMA",
     );
   } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+// --- multiMulti aggregation (plan 2026-05-18-005 U1) ---
+// Target redirection via the adapters' designed env seam: claude.mjs reads
+// env.CLAUDE_HOME, codex.mjs reads env.CODEX_HOME (NOT a speculative
+// "HOME-override"). assertCliPresent is satisfied for ALL THREE via a
+// PATH-stub: whichSync only checks isFile(), so an empty file named after
+// each adapter's cliBinary on env.PATH passes. updateMulti AND
+// uninstallMulti have no `allowNoCli` param (only installMulti does), so
+// the PATH-stub — not allowNoCli — is the uniform gate-bypass.
+
+function multiEnv() {
+  const claudeHome = tmp("u1m-cl-");
+  const codexHome = tmp("u1m-cx-");
+  const binDir = tmp("u1m-bin-");
+  fs.writeFileSync(path.join(binDir, "claude"), "");
+  fs.writeFileSync(path.join(binDir, "codex"), "");
+  const env = {
+    ...process.env,
+    CLAUDE_HOME: claudeHome,
+    CODEX_HOME: codexHome,
+    PATH: binDir + path.delimiter + (process.env.PATH || ""),
+  };
+  return {
+    env, claudeHome, codexHome,
+    cleanup() { for (const d of [claudeHome, codexHome, binDir]) fs.rmSync(d, { recursive: true, force: true }); },
+  };
+}
+function multiBase(m, extra = {}) {
+  return {
+    repoRoot: SAMPLE, productConfig, installerVersion: "test",
+    selectionIds: ["sample:hello-world"], env: m.env, ...extra,
+  };
+}
+
+test("installMulti: all-ok aggregation across two real adapters (env seam)", async () => {
+  const m = multiEnv();
+  try {
+    const r = await installMulti(multiBase(m, { adapterIds: ["claude-code", "codex"], allowNoCli: true }));
+    assert.deepEqual(r.adapterIds, ["claude-code", "codex"]);
+    assert.equal(r.okCount, 2);
+    assert.equal(r.failCount, 0);
+    assert.equal(r.results.length, 2);
+    assert.ok(r.results.every((x) => x.ok === true));
+    assert.ok(readState(m.claudeHome)?.managedFiles.length >= 1, "claude target written under CLAUDE_HOME");
+    assert.ok(readState(m.codexHome)?.managedFiles.length >= 1, "codex target written under CODEX_HOME");
+  } finally { m.cleanup(); }
+});
+
+test("installMulti: duplicate adapter ids collapse to unique", async () => {
+  const m = multiEnv();
+  try {
+    const r = await installMulti(multiBase(m, { adapterIds: ["claude-code", "claude-code", "codex"], allowNoCli: true }));
+    assert.deepEqual(r.adapterIds, ["claude-code", "codex"], "deduped");
+    assert.equal(r.results.length, 2);
+    assert.equal(r.okCount, 2);
+  } finally { m.cleanup(); }
+});
+
+test("installMulti: a per-adapter failure is wrapped into failCount, not propagated", async () => {
+  const m = multiEnv();
+  try {
+    const r = await installMulti(multiBase(m, { adapterIds: ["claude-code", "no-such-adapter"], allowNoCli: true }));
+    assert.equal(r.okCount, 1, "the valid adapter still succeeds");
+    assert.equal(r.failCount, 1, "the unknown adapter is counted as a failure");
+    const bad = r.results.find((x) => x.adapterId === "no-such-adapter");
+    assert.equal(bad.ok, false);
+    assert.ok(bad.error?.code, "the per-adapter error is captured in results, not thrown");
+  } finally { m.cleanup(); }
+});
+
+test("uninstallMulti: round-trips installMulti state across both adapters (no allowNoCli param)", async () => {
+  const m = multiEnv();
+  try {
+    await installMulti(multiBase(m, { adapterIds: ["claude-code", "codex"], allowNoCli: true }));
+    const r = await uninstallMulti(multiBase(m, { adapterIds: ["claude-code", "codex"], yes: true, force: true }));
+    assert.equal(r.okCount, 2);
+    assert.equal(r.failCount, 0);
+    const cl = readState(m.claudeHome);
+    assert.ok(!cl || cl.managedFiles.length === 0, "claude managed files removed");
+  } finally { m.cleanup(); }
+});
+
+test("updateMulti: okCount path reachable via PATH-stub (updateMulti has no allowNoCli)", async () => {
+  const m = multiEnv();
+  try {
+    await installMulti(multiBase(m, { adapterIds: ["claude-code", "codex"], allowNoCli: true }));
+    const r = await updateMulti(multiBase(m, { adapterIds: ["claude-code", "codex"] }));
+    assert.equal(r.adapterIds.length, 2);
+    assert.equal(r.failCount, 0, "assertCliPresent satisfied by the PATH-stub, not allowNoCli");
+    assert.equal(r.okCount, 2);
+  } finally { m.cleanup(); }
 });
