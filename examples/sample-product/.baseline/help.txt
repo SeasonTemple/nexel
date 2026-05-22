@@ -1,4 +1,4 @@
-sample-installer v0.6.0 — managed installer
+sample-installer v0.6.1 — managed installer
 
 Usage:
   sample-installer <verb> [flags]

@@ -5,13 +5,16 @@ assets manually from a local checkout except as an emergency repair.
 
 ## Normal path
 
-1. Update `package.json` / `package-lock.json` with the next version:
+1. Prepare the next version and release-note stub:
 
    ```sh
-   npm version patch --no-git-tag-version
+   npm run release:prepare -- patch
    ```
 
-   Use `minor` or `major` when the release scope warrants it.
+   Use `minor` or `major` when the release scope warrants it. The helper updates
+   `package.json` / `package-lock.json`, creates
+   `docs/release-notes/vX.Y.Z.md` if missing, and prints the remaining manual
+   commands. It does not commit, tag, or push.
 
 2. Write `docs/release-notes/vX.Y.Z.md` with both required language sections:
 
@@ -31,8 +34,7 @@ assets manually from a local checkout except as an emergency repair.
    npm test
    npm run release:preflight
    node scripts/verify-release-tag.mjs vX.Y.Z
-   npm run dist
-   rm -f nexel-*.tgz nexel-*.tgz.sha256
+   npm run package:smoke
    ```
 
 4. Push `main`, then push the tag:
@@ -55,13 +57,15 @@ assets manually from a local checkout except as an emergency repair.
 ## Guardrails
 
 - `CI` runs on `main` and pull requests: `npm ci`, `npm test`, and
-  `npm run release:preflight`.
+  `npm run release:preflight`, and `npm run package:smoke`.
 - `Release` runs on `v*.*.*` tags. It verifies tag/package/release-note
   alignment and the bilingual release-note requirement, reruns tests and
   preflight, builds the tarball, and creates the GitHub Release with both
   assets.
 - Release title is the tag by default. Human-friendly positioning belongs in
-  the release note body.
+  the release note body. When a release includes installer UX changes, keep the
+  visual demo link visible in the release note:
+  `https://github.com/SeasonTemple/nexel/blob/main/assets/install-uninstall-flow.gif`.
 - Commit messages must match `<type>(<scope>): <summary>` or `release:
   vX.Y.Z`. The `.gitmessage` file is installed as the local git commit
   template by `npm install`, and `.husky/commit-msg` enforces the format.

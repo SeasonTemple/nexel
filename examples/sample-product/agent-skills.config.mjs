@@ -1,9 +1,9 @@
 // Sample ProductConfig — demonstrates the contract required by `createCli()`
-// and `defineProductConfig()` from agent-skills-installer.
+// and `defineProductConfig()` from nexel.
 //
 // In a real downstream repo, this file lives at the repo root and is the
 // only product-identity surface the installer kernel ever reads. Rename
-// fields freely — `agent-skills-installer` treats them as opaque tokens.
+// fields freely — `nexel` treats them as opaque tokens.
 
 import { defineProductConfig } from "../../scripts/installer/index.mjs";
 

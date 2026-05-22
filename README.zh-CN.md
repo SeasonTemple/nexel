@@ -133,6 +133,17 @@ node scripts/install-skills.mjs --demo --yes --target /tmp/nexel-demo --agent co
 find /tmp/nexel-demo -maxdepth 4 -type f -print
 ```
 
+如需演示状态追踪与修复:
+
+```sh
+rm -rf /tmp/nexel-demo
+node examples/sample-product/bin.mjs install --agent codex --target /tmp/nexel-demo --bundle sample-demo --yes --allow-no-cli
+printf '\nlocal edit\n' >> /tmp/nexel-demo/skills/demo-bundle-skill/SKILL.md
+node examples/sample-product/bin.mjs doctor --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo --apply --accept-modified skills/demo-bundle-skill/SKILL.md
+```
+
 如需演示一次完整安装再卸载:
 
 ```sh
@@ -164,6 +175,32 @@ node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-wor
 
 bin 的品牌名由 `productConfig.binName` 决定;产品接入后,`nexel` 自身不
 出现在任何面向用户的文本中。构建产品见 [ProductConfig](#productconfig)。
+
+### 面向下游产品 —— 参考实现
+
+以 [`examples/sample-product/`](./examples/sample-product/) 作为模板:
+
+1. 复制目录形态:`agent-skills.config.mjs`、`install.json`、`skills/`、
+   `agents/`、`rules/` 与一个很薄的产品 `bin.mjs`。
+2. 设置 `ProductConfig` 身份:`productName`、`skillIdPrefix`、
+   `agentNamePrefix`、`defaultManifestFile`、`binName`。
+3. 在 Manifest 注册每个可安装 skill / agent / rule。未进入 Manifest 的
+   文件对 Kernel 刻意不可见。
+4. 用 `createCli({ adapters, productConfig, version })` 构建产品 bin。
+5. 增加产品级测试:用临时 target spawn bin,断言 `list`、`plan`、
+   `install`、`doctor`、`repair` 行为。
+6. 对 OpenCode runtime instructions,在 `SKILL.md` frontmatter 保留
+   `opencode-instructions`,并用 `configureOpenCode` 接入产品 plugin。
+
+下游产品的最低烟测命令:
+
+```sh
+<bin> list --json
+<bin> plan --agent codex --target /tmp/product-demo --bundle <bundle-id>
+<bin> install --agent codex --target /tmp/product-demo --bundle <bundle-id> --yes --allow-no-cli
+<bin> doctor --agent codex --target /tmp/product-demo --json
+<bin> repair --agent codex --target /tmp/product-demo --json
+```
 
 ### 面向 AI agent —— 驱动 bin
 
@@ -387,6 +424,8 @@ kernel 表面,与任何产品的 bin 名称或内容无关。
 
 ```sh
 npm test
+npm run package:smoke
+npm run verify:baseline
 ```
 
 `npm test` 跑全套;`package.json` 中的 `test` script 是权威且始终最新的
@@ -395,6 +434,14 @@ npm test
 一致性(`spi`、`opencode`)、CLI 层(`argv`、`dispatch`、`lint-skills`、
 `lint-release-sync`)、Z 层守卫(`architecture`)、`examples/sample-product/`
 端到端(`sample-bin`、`repair-rehash`)。
+
+`npm run package:smoke` 会构建 tarball,验证可视化 GIF、sample product、
+公共 adapters、release notes 等必需文件已被打进包,然后删除生成的
+tarball/checksum。CI 在每次 push 和 PR 上运行它。
+
+`npm run verify:baseline` 会对比 `examples/sample-product/.baseline/` 下的
+稳定 sample-bin 输出。只有在有意修改 CLI 文本或 JSON 契约并完成 review 后,
+才运行 `npm run verify:baseline -- --update` 更新 baseline。
 
 ### 许可证
 

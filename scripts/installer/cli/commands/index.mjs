@@ -814,11 +814,26 @@ export function agentsCommand({ repoRoot, env = process.env } = {}) {
  *  - lock file age (stale lock detection)
  *  - per-managed-file existence + hash match (sampled — limit cost)
  */
-export function doctorCommand({ repoRoot, adapterId, env = process.env } = {}) {
+export function doctorCommand({ repoRoot, adapterId, target, env = process.env } = {}) {
   const adapters = applyProfileToAdapters(listAdapterStatus({ env }), env);
-  const filtered = adapterId
+  const filtered = (adapterId
     ? adapters.filter((a) => a.id === adapterId)
-    : adapters.filter((a) => a.supportsDirect);
+    : adapters.filter((a) => a.supportsDirect))
+    .map((a) => {
+      if (!target) return a;
+      const targetRoot = path.resolve(target);
+      const exists = fs.existsSync(targetRoot);
+      let writable = false;
+      if (exists) {
+        try {
+          fs.accessSync(targetRoot, fs.constants.W_OK);
+          writable = true;
+        } catch {
+          writable = false;
+        }
+      }
+      return { ...a, targetRoot, exists, writable };
+    });
 
   const reports = [];
   for (const a of filtered) {

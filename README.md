@@ -138,6 +138,17 @@ node scripts/install-skills.mjs --demo --yes --target /tmp/nexel-demo --agent co
 find /tmp/nexel-demo -maxdepth 4 -type f -print
 ```
 
+To exercise state tracking and repair:
+
+```sh
+rm -rf /tmp/nexel-demo
+node examples/sample-product/bin.mjs install --agent codex --target /tmp/nexel-demo --bundle sample-demo --yes --allow-no-cli
+printf '\nlocal edit\n' >> /tmp/nexel-demo/skills/demo-bundle-skill/SKILL.md
+node examples/sample-product/bin.mjs doctor --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo --apply --accept-modified skills/demo-bundle-skill/SKILL.md
+```
+
 To demo install and uninstall in one safe run:
 
 ```sh
@@ -170,6 +181,33 @@ node examples/sample-product/bin.mjs plan --agent codex --skill sample:hello-wor
 The bin is branded by `productConfig.binName`; `nexel` does not appear in
 user-facing text once a product is wired up. To build a product, see
 [ProductConfig](#productconfig).
+
+### For downstream products — reference implementation
+
+Use [`examples/sample-product/`](./examples/sample-product/) as the template:
+
+1. Copy the directory shape: `agent-skills.config.mjs`, `install.json`,
+   `skills/`, `agents/`, `rules/`, and a thin product `bin.mjs`.
+2. Set `ProductConfig` identity: `productName`, `skillIdPrefix`,
+   `agentNamePrefix`, `defaultManifestFile`, and `binName`.
+3. Register every installable skill / agent / rule in the Manifest. Files that
+   are not in the Manifest are intentionally invisible to the Kernel.
+4. Build the bin with `createCli({ adapters, productConfig, version })`.
+5. Add product tests that spawn the bin against a temp target and assert
+   `list`, `plan`, `install`, `doctor`, and `repair` behavior.
+6. For OpenCode runtime instructions, keep `opencode-instructions` in
+   `SKILL.md` frontmatter and wire a product plugin through
+   `configureOpenCode`.
+
+Minimum smoke commands for a downstream product:
+
+```sh
+<bin> list --json
+<bin> plan --agent codex --target /tmp/product-demo --bundle <bundle-id>
+<bin> install --agent codex --target /tmp/product-demo --bundle <bundle-id> --yes --allow-no-cli
+<bin> doctor --agent codex --target /tmp/product-demo --json
+<bin> repair --agent codex --target /tmp/product-demo --json
+```
 
 ### For AI agents — drive a bin
 
@@ -400,6 +438,8 @@ The public surface is still iterating — pin a tag.
 
 ```sh
 npm test
+npm run package:smoke
+npm run verify:baseline
 ```
 
 `npm test` runs the full suite; the `test` script in `package.json` is the
@@ -409,6 +449,14 @@ loader/validator/drift), adapter conformance (`spi`, `opencode`), CLI surface
 (`argv`, `dispatch`, `lint-skills`, `lint-release-sync`), the Z-layer guard
 (`architecture`), and `examples/sample-product/` end-to-end (`sample-bin`,
 `repair-rehash`).
+
+`npm run package:smoke` builds the tarball, verifies required packaged files
+such as the visual GIF, sample product, public adapters, and release notes, then
+removes the generated tarball/checksum. CI runs this on every push and PR.
+
+`npm run verify:baseline` compares stable sample-bin outputs under
+`examples/sample-product/.baseline/`. Use `npm run verify:baseline -- --update`
+only when a deliberate CLI text or JSON contract change has been reviewed.
 
 ### License
 

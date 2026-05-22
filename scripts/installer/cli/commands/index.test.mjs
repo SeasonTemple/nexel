@@ -166,6 +166,20 @@ test("doctorCommand: returns a structured health report with reports + counts", 
   assert.equal(typeof out.failCount, "number", "failCount is numeric");
 });
 
+test("doctorCommand: --target override scopes the health report to the requested sandbox", () => {
+  const target = tmp("doctor-target-");
+  try {
+    const out = doctorCommand({ repoRoot: SAMPLE, adapterId: "codex", target, env: process.env });
+    assert.equal(out.reports.length, 1);
+    const report = out.reports[0];
+    assert.equal(report.targetRoot, path.resolve(target));
+    assert.ok(report.checks.some((check) => check.name === "target-exists" && check.ok === true));
+    assert.ok(report.checks.some((check) => check.name === "target-writable" && check.ok === true));
+  } finally {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
 test("export -> import round-trips the installed selection set", async () => {
   const target = tmp("u1-exp-");
   try {

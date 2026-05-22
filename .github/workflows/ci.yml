@@ -31,3 +31,6 @@ jobs:
 
       - name: Release preflight
         run: npm run release:preflight
+
+      - name: Package smoke test
+        run: npm run package:smoke

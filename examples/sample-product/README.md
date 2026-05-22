@@ -55,6 +55,17 @@ node scripts/install-skills.mjs --demo --yes --target /tmp/nexel-demo --agent co
 find /tmp/nexel-demo -maxdepth 4 -type f -print
 ```
 
+To inspect the state/repair path:
+
+```sh
+rm -rf /tmp/nexel-demo
+node examples/sample-product/bin.mjs install --agent codex --target /tmp/nexel-demo --bundle sample-demo --yes --allow-no-cli
+printf '\nlocal edit\n' >> /tmp/nexel-demo/skills/demo-bundle-skill/SKILL.md
+node examples/sample-product/bin.mjs doctor --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo --apply --accept-modified skills/demo-bundle-skill/SKILL.md
+```
+
 To demo install and uninstall in one safe run:
 
 ```sh
@@ -90,3 +101,25 @@ node examples/sample-product/bin.mjs install --target /tmp/nexel-demo --bundle s
 The root `scripts/install-skills.mjs` convenience script forwards ordinary
 verbs such as `list`, `plan`, `install`, and `doctor` to this bin. Its no-arg
 mode only adds the visual demo wrapper around the same kernel path.
+
+## Use this as a reference implementation
+
+A downstream product should keep the same responsibilities split:
+
+| File | Owns |
+|---|---|
+| `agent-skills.config.mjs` | Product identity and env names passed to `defineProductConfig()` |
+| `sample.install.json` | Manifest-visible skills, agents, rules, and bundles |
+| `skills/`, `agents/`, `rules/` | Source content copied or transformed into target agent CLIs |
+| `bin.mjs` | Thin product executable created with `createCli({ adapters, productConfig, version })` |
+| `.opencode/plugins/sample-product.js` | Optional OpenCode runtime plugin for `opencode-instructions` |
+
+The minimum consumer smoke path is:
+
+```sh
+node examples/sample-product/bin.mjs list --json
+node examples/sample-product/bin.mjs plan --agent codex --target /tmp/nexel-demo --bundle sample-demo
+node examples/sample-product/bin.mjs install --agent codex --target /tmp/nexel-demo --bundle sample-demo --yes --allow-no-cli
+node examples/sample-product/bin.mjs doctor --agent codex --target /tmp/nexel-demo --json
+node examples/sample-product/bin.mjs repair --agent codex --target /tmp/nexel-demo --json
+```
