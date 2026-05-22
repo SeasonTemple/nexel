@@ -15,15 +15,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(HERE, "bin.mjs");
 
-function runBin(args = []) {
+function runBin(args = [], env = {}) {
   const result = spawnSync("node", [BIN, ...args], {
     encoding: "utf8",
     cwd: HERE,
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, ...env, FORCE_COLOR: "0" },
   });
   return {
     code: result.status,
@@ -144,10 +145,22 @@ test("run: list/agents/plan emit shaped --json envelopes, exit 0", () => {
 });
 
 test("run: list/agents text mode exit 0, output on stdout", () => {
-  for (const verb of ["list", "agents"]) {
-    const r = runBin([verb]);
+  const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "sample-bin-agents-"));
+  for (const binName of ["claude", "codex", "opencode"]) {
+    const binPath = path.join(fakeBinDir, binName);
+    fs.writeFileSync(binPath, "#!/bin/sh\nexit 0\n");
+    fs.chmodSync(binPath, 0o755);
+  }
+  const env = { PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH || ""}` };
+
+  try {
+    for (const verb of ["list", "agents"]) {
+      const r = runBin([verb], env);
     assert.equal(r.code, 0, `${verb} text exit 0`);
     assert.ok(r.stdout.length > 0, `${verb} writes stdout`);
+    }
+  } finally {
+    fs.rmSync(fakeBinDir, { recursive: true, force: true });
   }
 });
 
