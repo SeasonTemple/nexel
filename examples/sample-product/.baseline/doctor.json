@@ -1,0 +1,90 @@
+{
+  "reports": [
+    {
+      "adapterId": "claude-code",
+      "displayName": "Claude Code",
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/claude",
+      "checks": [
+        {
+          "name": "cli-present",
+          "ok": false,
+          "detail": "claude NOT in PATH; install: https://docs.claude.com/claude-code"
+        },
+        {
+          "name": "target-exists",
+          "ok": false,
+          "detail": "<BASELINE_ROOT>/agent-homes/claude absent (would be created on first install)"
+        },
+        {
+          "name": "target-writable",
+          "ok": true,
+          "detail": "writable"
+        },
+        {
+          "name": "state-readable",
+          "ok": true,
+          "detail": "no state.json (no managed installations yet)"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "adapterId": "codex",
+      "displayName": "Codex",
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/codex",
+      "checks": [
+        {
+          "name": "cli-present",
+          "ok": false,
+          "detail": "codex NOT in PATH; install: https://github.com/openai/codex"
+        },
+        {
+          "name": "target-exists",
+          "ok": false,
+          "detail": "<BASELINE_ROOT>/agent-homes/codex absent (would be created on first install)"
+        },
+        {
+          "name": "target-writable",
+          "ok": true,
+          "detail": "writable"
+        },
+        {
+          "name": "state-readable",
+          "ok": true,
+          "detail": "no state.json (no managed installations yet)"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "adapterId": "opencode",
+      "displayName": "OpenCode",
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/opencode",
+      "checks": [
+        {
+          "name": "cli-present",
+          "ok": false,
+          "detail": "opencode NOT in PATH; install: https://opencode.ai"
+        },
+        {
+          "name": "target-exists",
+          "ok": false,
+          "detail": "<BASELINE_ROOT>/agent-homes/opencode absent (would be created on first install)"
+        },
+        {
+          "name": "target-writable",
+          "ok": true,
+          "detail": "writable"
+        },
+        {
+          "name": "state-readable",
+          "ok": true,
+          "detail": "no state.json (no managed installations yet)"
+        }
+      ],
+      "ok": false
+    }
+  ],
+  "okCount": 0,
+  "failCount": 3
+}

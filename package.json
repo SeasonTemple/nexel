@@ -1,6 +1,6 @@
 {
   "name": "nexel",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Kernel library for managing agent skills, agents, and rules across Claude Code, Codex, and OpenCode — product-agnostic installer driven by a per-product ProductConfig.",
@@ -30,6 +30,7 @@
     "./adapters/claude": "./scripts/installer/adapters/claude.mjs",
     "./adapters/codex": "./scripts/installer/adapters/codex.mjs",
     "./adapters/opencode": "./scripts/installer/adapters/opencode.mjs",
+    "./adapters/opencode-plugin": "./scripts/installer/adapters/opencode-plugin.mjs",
     "./lint-skills": "./scripts/lint-skills.mjs"
   },
   "files": [
@@ -38,14 +39,18 @@
     "scripts/install-husky.mjs",
     "examples/sample-product/**",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/build-dist.mjs",
+    "scripts/release-preflight.mjs",
+    "scripts/verify-baseline.mjs",
+    "docs/release-notes/**"
   ],
   "scripts": {
-    "lint:skills": "node scripts/lint-skills.mjs",
-    "lint:manifest": "node scripts/installer/core/manifest/validator.mjs",
-    "lint:drift": "node scripts/installer/core/manifest/drift.mjs",
+    "lint:skills": "node scripts/lint-skills.mjs --dir=examples/sample-product/skills --id-prefix=sample",
+    "lint:manifest": "node scripts/installer/core/manifest/validator.mjs --manifest=examples/sample-product/sample.install.json",
+    "lint:drift": "node scripts/installer/core/manifest/drift.mjs --manifest=examples/sample-product/sample.install.json",
     "lint:release-sync": "node scripts/lint-release-sync.mjs",
-    "fix:drift": "node scripts/installer/core/manifest/drift.mjs --fix",
+    "fix:drift": "node scripts/installer/core/manifest/drift.mjs --manifest=examples/sample-product/sample.install.json --fix",
     "test:lint": "node --test scripts/lint-skills.test.mjs",
     "test:release-sync": "node --test scripts/lint-release-sync.test.mjs",
     "test:plan": "node --test scripts/installer/core/plan.test.mjs",
@@ -66,14 +71,22 @@
     "test:error-format": "node --test scripts/installer/cli/error-format.test.mjs",
     "test:spi": "node --test scripts/installer/adapters/spi.test.mjs",
     "test:opencode": "node --test scripts/installer/adapters/opencode.test.mjs",
+    "test:opencode-plugin": "node --test scripts/installer/adapters/opencode-plugin.test.mjs",
     "test:architecture": "node --test scripts/installer/architecture.test.mjs",
     "test:sample-bin": "node --test examples/sample-product/sample-bin.test.mjs",
-    "test": "node --test scripts/lint-skills.test.mjs scripts/lint-release-sync.test.mjs scripts/installer/core/manifest/loader.test.mjs scripts/installer/core/manifest/validator.test.mjs scripts/installer/core/manifest/drift.test.mjs scripts/installer/core/errors.test.mjs scripts/installer/core/asset-types.test.mjs scripts/installer/core/which.test.mjs scripts/installer/core/plan.test.mjs scripts/installer/core/stage-asset.test.mjs scripts/installer/cli/commands/repair-rehash.test.mjs scripts/installer/cli/commands/index.test.mjs scripts/installer/cli/argv.test.mjs scripts/installer/cli/dispatch.test.mjs scripts/installer/cli/help.test.mjs scripts/installer/cli/strings.test.mjs scripts/installer/cli/prompts.test.mjs scripts/installer/cli/error-format.test.mjs scripts/installer/adapters/spi.test.mjs scripts/installer/adapters/opencode.test.mjs scripts/installer/architecture.test.mjs examples/sample-product/sample-bin.test.mjs",
+    "test": "node --test scripts/lint-skills.test.mjs scripts/lint-release-sync.test.mjs scripts/release-preflight.test.mjs scripts/verify-baseline.test.mjs scripts/installer/core/manifest/loader.test.mjs scripts/installer/core/manifest/validator.test.mjs scripts/installer/core/manifest/drift.test.mjs scripts/installer/core/errors.test.mjs scripts/installer/core/asset-types.test.mjs scripts/installer/core/which.test.mjs scripts/installer/core/plan.test.mjs scripts/installer/core/stage-asset.test.mjs scripts/installer/cli/commands/repair-rehash.test.mjs scripts/installer/cli/commands/index.test.mjs scripts/installer/cli/argv.test.mjs scripts/installer/cli/dispatch.test.mjs scripts/installer/cli/help.test.mjs scripts/installer/cli/strings.test.mjs scripts/installer/cli/locale-isolation.test.mjs scripts/installer/cli/prompts.test.mjs scripts/installer/cli/error-format.test.mjs scripts/installer/adapters/spi.test.mjs scripts/installer/adapters/opencode.test.mjs scripts/installer/adapters/opencode-plugin.test.mjs scripts/installer/architecture.test.mjs scripts/installer/conformance.test.mjs examples/sample-product/sample-bin.test.mjs examples/sample-product/sample-opencode-plugin.test.mjs",
     "setup:hooks": "husky",
     "prepare": "node scripts/install-husky.mjs",
     "release:patch": "npm version patch -m \"chore(release): %s\"",
     "release:minor": "npm version minor -m \"chore(release): %s\"",
-    "release:major": "npm version major -m \"chore(release): %s\""
+    "release:major": "npm version major -m \"chore(release): %s\"",
+    "test:locale-isolation": "node --test scripts/installer/cli/locale-isolation.test.mjs",
+    "test:baseline": "node --test scripts/verify-baseline.test.mjs",
+    "test:release-preflight": "node --test scripts/release-preflight.test.mjs",
+    "test:conformance": "node --test scripts/installer/conformance.test.mjs",
+    "verify:baseline": "node scripts/verify-baseline.mjs",
+    "dist": "node scripts/build-dist.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

@@ -221,16 +221,20 @@ function main() {
   const json = args.includes("--json");
   const fix = args.includes("--fix");
   const dryRun = args.includes("--dry-run");
-  const repoRoot = path.resolve(process.cwd());
-  const manifestPath = defaultManifestPath(repoRoot);
+  const manifestFlag = args.find((arg) => arg.startsWith("--manifest="));
+  const manifestPath = manifestFlag
+    ? path.resolve(manifestFlag.slice("--manifest=".length))
+    : defaultManifestPath(path.resolve(process.cwd()));
+  const repoRoot = path.dirname(manifestPath);
   if (!fs.existsSync(manifestPath)) {
     process.stderr.write(`manifest not found: ${manifestPath}\n`);
     process.exit(2);
   }
-  const result = detectDrift({ repoRoot });
+  const manifest = loadManifest(manifestPath);
+  const result = detectDrift({ repoRoot, manifest });
 
   if (fix) {
-    const { fixed, log } = applyFix({ repoRoot, drift: result });
+    const { fixed, log } = applyFix({ repoRoot, manifest, drift: result });
     const summary = summarizeFix(log);
     const hasChanges =
       log.added.length + log.removed.length + log.categoryUpdated.length +
@@ -245,7 +249,7 @@ function main() {
     }
     fs.writeFileSync(manifestPath, JSON.stringify(fixed, null, 2) + "\n");
     process.stderr.write(`autofix applied:\n${summary}\n`);
-    const after = detectDrift({ repoRoot });
+    const after = detectDrift({ repoRoot, manifest: fixed });
     if (json) process.stdout.write(formatDrift(after, "json") + "\n");
     process.exit(after.pass ? 0 : 1);
   }

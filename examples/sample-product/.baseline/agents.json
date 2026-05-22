@@ -1,0 +1,43 @@
+{
+  "adapters": [
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "supportsDirect": true,
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/claude",
+      "exists": false,
+      "writable": true,
+      "cliBinary": "claude",
+      "cliPath": null,
+      "cliPresent": false,
+      "cliInstallUrl": "https://docs.claude.com/claude-code",
+      "notes": "Claude Code home not present; would be created on first install"
+    },
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "supportsDirect": true,
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/codex",
+      "exists": false,
+      "writable": true,
+      "cliBinary": "codex",
+      "cliPath": null,
+      "cliPresent": false,
+      "cliInstallUrl": "https://github.com/openai/codex",
+      "notes": "Codex home not present; would be created on first install"
+    },
+    {
+      "id": "opencode",
+      "displayName": "OpenCode",
+      "supportsDirect": true,
+      "targetRoot": "<BASELINE_ROOT>/agent-homes/opencode",
+      "exists": false,
+      "writable": true,
+      "cliBinary": "opencode",
+      "cliPath": null,
+      "cliPresent": false,
+      "cliInstallUrl": "https://opencode.ai",
+      "notes": "OpenCode global config not present; would be created on first install"
+    }
+  ]
+}

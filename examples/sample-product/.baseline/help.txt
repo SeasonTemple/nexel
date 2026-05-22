@@ -1,0 +1,54 @@
+sample-installer v0.6.0 — managed installer
+
+Usage:
+  sample-installer <verb> [flags]
+
+Verbs:
+  install                    Install selected skills/bundles into a target agent home
+  uninstall                  Remove managed files for selections (state-aware)
+  update                     Refresh managed files whose source has changed (hash-checked)
+  list                       List manifest assets and (optional) installed status
+  plan                       Show install plan without writing (--dry-run alias)
+  agents                     Detect supported agent targets and writable status
+  doctor                     Health-check installer environment per agent (CLI, target, state, drift, locks)
+  repair                     Reconcile state.json against disk (default: scan only; --apply to fix)
+  export                     Dump installed selection set as JSON to stdout (portable across machines)
+  import                     Read selection-set JSON from stdin and install (pair with export)
+  validate <path/SKILL.md>   Lint a single SKILL.md frontmatter without scanning the whole repo
+  help                       Show this message
+
+Common flags:
+  --agent, -a <id>           Target agent: claude-code | codex | opencode
+                             Repeat or comma-separate to install to multiple agents in one run
+                             (e.g. -a codex -a claude-code OR --agent=codex,claude-code)
+  --target <path>            Explicit target root (overrides --agent default; single-agent only)
+  --profile <name>           Append .<name> suffix to target root (sandbox/devbox isolation).
+                             Also reads SAMPLE_PROFILE env var. Allowed: [A-Za-z0-9_-]{1,32}.
+                             Ignored when --target is provided. Example: codex + --profile dev
+                             → ~/.codex.dev/ (fully isolated state + skill tree)
+  --lang <en|zh>             Human-facing output locale (env: NEXEL_LANG or product env)
+  --allow-no-cli             Skip CLI binary detection check (advanced; portable installs)
+  --no-banner                Hide ASCII intro banner (interactive flow only)
+  --banner-title <text>      Override interactive banner title (env: SAMPLE_BANNER_TITLE)
+  --skill, -s <ids...>       Skill ids (repeat or comma-separate)
+  --bundle, -b <ids...>      Bundle ids (manifest-defined; see 'list')
+  --all                      Expand to all installable standalone skills
+  --mode <plugin|direct>     Install mode (default: direct)
+  --dry-run                  Preview plan without writing
+  --yes, -y                  Skip interactive prompts (required for non-interactive install/uninstall)
+  --overwrite                Replace unmanaged files at target paths (install)
+  --apply                    (repair) Actually perform the repair (default is scan-only / read-only)
+  --force                    Bypass hash check for uninstall (use with --accept-modified)
+  --accept-modified <relPath...>
+                             Per-file consent for --force uninstall
+  --json                     Machine-readable output
+  --print-path <id>          (agents) Print just the target root path for the named agent
+                             (script-friendly: cd "$(sample-installer agents --print-path codex)")
+  -h, --help                 Show help
+
+Examples:
+  sample-installer agents
+  sample-installer list --agent codex
+  sample-installer plan --agent claude-code --bundle <bundle-id>
+  sample-installer install --agent codex --skill sample:<skill-id> -y
+  sample-installer uninstall --agent codex --skill sample:<skill-id> -y

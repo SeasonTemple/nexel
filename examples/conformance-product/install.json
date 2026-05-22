@@ -1,0 +1,609 @@
+{
+  "schemaVersion": 1,
+  "skills": {
+    "conf:skill-01": {
+      "id": "conf:skill-01",
+      "dirname": "skill-01",
+      "sourcePath": "skills/skill-01",
+      "category": "principle",
+      "profile": "standalone",
+      "description": "Generic conformance skill 01."
+    },
+    "conf:skill-02": {
+      "id": "conf:skill-02",
+      "dirname": "skill-02",
+      "sourcePath": "skills/skill-02",
+      "category": "best-practice",
+      "profile": "bundle",
+      "description": "Generic conformance skill 02."
+    },
+    "conf:skill-03": {
+      "id": "conf:skill-03",
+      "dirname": "skill-03",
+      "sourcePath": "skills/skill-03",
+      "category": "test",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 03.",
+      "dependencies": {
+        "agents": [
+          "agent-03"
+        ],
+        "rules": [
+          "rules/rule-03.md"
+        ]
+      }
+    },
+    "conf:skill-04": {
+      "id": "conf:skill-04",
+      "dirname": "skill-04",
+      "sourcePath": "skills/skill-04",
+      "category": "review",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 04.",
+      "appliesTo": [
+        "opencode"
+      ]
+    },
+    "conf:skill-05": {
+      "id": "conf:skill-05",
+      "dirname": "skill-05",
+      "sourcePath": "skills/skill-05",
+      "category": "tool",
+      "profile": "standalone",
+      "description": "Generic conformance skill 05."
+    },
+    "conf:skill-06": {
+      "id": "conf:skill-06",
+      "dirname": "skill-06",
+      "sourcePath": "skills/skill-06",
+      "category": "setup",
+      "profile": "bundle",
+      "description": "Generic conformance skill 06.",
+      "dependencies": {
+        "agents": [
+          "agent-06"
+        ],
+        "rules": [
+          "rules/rule-06.md"
+        ]
+      }
+    },
+    "conf:skill-07": {
+      "id": "conf:skill-07",
+      "dirname": "skill-07",
+      "sourcePath": "skills/skill-07",
+      "category": "principle",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 07.",
+      "dependencies": {
+        "skills": [
+          "conf:skill-06"
+        ]
+      }
+    },
+    "conf:skill-08": {
+      "id": "conf:skill-08",
+      "dirname": "skill-08",
+      "sourcePath": "skills/skill-08",
+      "category": "best-practice",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 08.",
+      "appliesTo": [
+        "claude-code"
+      ]
+    },
+    "conf:skill-09": {
+      "id": "conf:skill-09",
+      "dirname": "skill-09",
+      "sourcePath": "skills/skill-09",
+      "category": "test",
+      "profile": "standalone",
+      "description": "Generic conformance skill 09.",
+      "dependencies": {
+        "agents": [
+          "agent-01"
+        ],
+        "rules": [
+          "rules/rule-01.md"
+        ]
+      }
+    },
+    "conf:skill-10": {
+      "id": "conf:skill-10",
+      "dirname": "skill-10",
+      "sourcePath": "skills/skill-10",
+      "category": "review",
+      "profile": "bundle",
+      "description": "Generic conformance skill 10."
+    },
+    "conf:skill-11": {
+      "id": "conf:skill-11",
+      "dirname": "skill-11",
+      "sourcePath": "skills/skill-11",
+      "category": "tool",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 11."
+    },
+    "conf:skill-12": {
+      "id": "conf:skill-12",
+      "dirname": "skill-12",
+      "sourcePath": "skills/skill-12",
+      "category": "setup",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 12.",
+      "appliesTo": [
+        "codex"
+      ],
+      "dependencies": {
+        "agents": [
+          "agent-04"
+        ],
+        "rules": [
+          "rules/rule-04.md"
+        ]
+      }
+    },
+    "conf:skill-13": {
+      "id": "conf:skill-13",
+      "dirname": "skill-13",
+      "sourcePath": "skills/skill-13",
+      "category": "principle",
+      "profile": "standalone",
+      "description": "Generic conformance skill 13."
+    },
+    "conf:skill-14": {
+      "id": "conf:skill-14",
+      "dirname": "skill-14",
+      "sourcePath": "skills/skill-14",
+      "category": "best-practice",
+      "profile": "bundle",
+      "description": "Generic conformance skill 14.",
+      "dependencies": {
+        "skills": [
+          "conf:skill-13"
+        ]
+      }
+    },
+    "conf:skill-15": {
+      "id": "conf:skill-15",
+      "dirname": "skill-15",
+      "sourcePath": "skills/skill-15",
+      "category": "test",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 15.",
+      "dependencies": {
+        "agents": [
+          "agent-07"
+        ],
+        "rules": [
+          "rules/rule-07.md"
+        ]
+      }
+    },
+    "conf:skill-16": {
+      "id": "conf:skill-16",
+      "dirname": "skill-16",
+      "sourcePath": "skills/skill-16",
+      "category": "review",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 16.",
+      "appliesTo": [
+        "opencode"
+      ]
+    },
+    "conf:skill-17": {
+      "id": "conf:skill-17",
+      "dirname": "skill-17",
+      "sourcePath": "skills/skill-17",
+      "category": "tool",
+      "profile": "standalone",
+      "description": "Generic conformance skill 17."
+    },
+    "conf:skill-18": {
+      "id": "conf:skill-18",
+      "dirname": "skill-18",
+      "sourcePath": "skills/skill-18",
+      "category": "setup",
+      "profile": "bundle",
+      "description": "Generic conformance skill 18.",
+      "dependencies": {
+        "agents": [
+          "agent-02"
+        ],
+        "rules": [
+          "rules/rule-02.md"
+        ]
+      }
+    },
+    "conf:skill-19": {
+      "id": "conf:skill-19",
+      "dirname": "skill-19",
+      "sourcePath": "skills/skill-19",
+      "category": "principle",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 19."
+    },
+    "conf:skill-20": {
+      "id": "conf:skill-20",
+      "dirname": "skill-20",
+      "sourcePath": "skills/skill-20",
+      "category": "best-practice",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 20.",
+      "appliesTo": [
+        "claude-code"
+      ]
+    },
+    "conf:skill-21": {
+      "id": "conf:skill-21",
+      "dirname": "skill-21",
+      "sourcePath": "skills/skill-21",
+      "category": "test",
+      "profile": "standalone",
+      "description": "Generic conformance skill 21.",
+      "dependencies": {
+        "agents": [
+          "agent-05"
+        ],
+        "rules": [
+          "rules/rule-05.md"
+        ],
+        "skills": [
+          "conf:skill-20"
+        ]
+      }
+    },
+    "conf:skill-22": {
+      "id": "conf:skill-22",
+      "dirname": "skill-22",
+      "sourcePath": "skills/skill-22",
+      "category": "review",
+      "profile": "bundle",
+      "description": "Generic conformance skill 22."
+    },
+    "conf:skill-23": {
+      "id": "conf:skill-23",
+      "dirname": "skill-23",
+      "sourcePath": "skills/skill-23",
+      "category": "tool",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 23."
+    },
+    "conf:skill-24": {
+      "id": "conf:skill-24",
+      "dirname": "skill-24",
+      "sourcePath": "skills/skill-24",
+      "category": "setup",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 24.",
+      "appliesTo": [
+        "codex"
+      ],
+      "dependencies": {
+        "agents": [
+          "agent-08"
+        ],
+        "rules": [
+          "rules/rule-08.md"
+        ]
+      }
+    },
+    "conf:skill-25": {
+      "id": "conf:skill-25",
+      "dirname": "skill-25",
+      "sourcePath": "skills/skill-25",
+      "category": "principle",
+      "profile": "standalone",
+      "description": "Generic conformance skill 25."
+    },
+    "conf:skill-26": {
+      "id": "conf:skill-26",
+      "dirname": "skill-26",
+      "sourcePath": "skills/skill-26",
+      "category": "best-practice",
+      "profile": "bundle",
+      "description": "Generic conformance skill 26."
+    },
+    "conf:skill-27": {
+      "id": "conf:skill-27",
+      "dirname": "skill-27",
+      "sourcePath": "skills/skill-27",
+      "category": "test",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 27.",
+      "dependencies": {
+        "agents": [
+          "agent-03"
+        ],
+        "rules": [
+          "rules/rule-03.md"
+        ]
+      }
+    },
+    "conf:skill-28": {
+      "id": "conf:skill-28",
+      "dirname": "skill-28",
+      "sourcePath": "skills/skill-28",
+      "category": "review",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 28.",
+      "appliesTo": [
+        "opencode"
+      ],
+      "dependencies": {
+        "skills": [
+          "conf:skill-27"
+        ]
+      }
+    },
+    "conf:skill-29": {
+      "id": "conf:skill-29",
+      "dirname": "skill-29",
+      "sourcePath": "skills/skill-29",
+      "category": "tool",
+      "profile": "standalone",
+      "description": "Generic conformance skill 29."
+    },
+    "conf:skill-30": {
+      "id": "conf:skill-30",
+      "dirname": "skill-30",
+      "sourcePath": "skills/skill-30",
+      "category": "setup",
+      "profile": "bundle",
+      "description": "Generic conformance skill 30.",
+      "dependencies": {
+        "agents": [
+          "agent-06"
+        ],
+        "rules": [
+          "rules/rule-06.md"
+        ]
+      }
+    },
+    "conf:skill-31": {
+      "id": "conf:skill-31",
+      "dirname": "skill-31",
+      "sourcePath": "skills/skill-31",
+      "category": "principle",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 31."
+    },
+    "conf:skill-32": {
+      "id": "conf:skill-32",
+      "dirname": "skill-32",
+      "sourcePath": "skills/skill-32",
+      "category": "best-practice",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 32.",
+      "appliesTo": [
+        "claude-code"
+      ]
+    },
+    "conf:skill-33": {
+      "id": "conf:skill-33",
+      "dirname": "skill-33",
+      "sourcePath": "skills/skill-33",
+      "category": "test",
+      "profile": "standalone",
+      "description": "Generic conformance skill 33.",
+      "dependencies": {
+        "agents": [
+          "agent-01"
+        ],
+        "rules": [
+          "rules/rule-01.md"
+        ]
+      }
+    },
+    "conf:skill-34": {
+      "id": "conf:skill-34",
+      "dirname": "skill-34",
+      "sourcePath": "skills/skill-34",
+      "category": "review",
+      "profile": "bundle",
+      "description": "Generic conformance skill 34."
+    },
+    "conf:skill-35": {
+      "id": "conf:skill-35",
+      "dirname": "skill-35",
+      "sourcePath": "skills/skill-35",
+      "category": "tool",
+      "profile": "repo-only",
+      "description": "Generic conformance skill 35.",
+      "dependencies": {
+        "skills": [
+          "conf:skill-34"
+        ]
+      }
+    },
+    "conf:skill-36": {
+      "id": "conf:skill-36",
+      "dirname": "skill-36",
+      "sourcePath": "skills/skill-36",
+      "category": "setup",
+      "profile": "host-specific",
+      "description": "Generic conformance skill 36.",
+      "appliesTo": [
+        "codex"
+      ],
+      "dependencies": {
+        "agents": [
+          "agent-04"
+        ],
+        "rules": [
+          "rules/rule-04.md"
+        ]
+      }
+    }
+  },
+  "agents": {
+    "agent-01": {
+      "id": "agent-01",
+      "sourcePath": "agents/agent-01.md",
+      "installedName": "conf-agent-01",
+      "description": "Generic conformance agent 1."
+    },
+    "agent-02": {
+      "id": "agent-02",
+      "sourcePath": "agents/agent-02.md",
+      "installedName": "conf-agent-02",
+      "description": "Generic conformance agent 2."
+    },
+    "agent-03": {
+      "id": "agent-03",
+      "sourcePath": "agents/agent-03.md",
+      "installedName": "conf-agent-03",
+      "description": "Generic conformance agent 3."
+    },
+    "agent-04": {
+      "id": "agent-04",
+      "sourcePath": "agents/agent-04.md",
+      "installedName": "conf-agent-04",
+      "description": "Generic conformance agent 4."
+    },
+    "agent-05": {
+      "id": "agent-05",
+      "sourcePath": "agents/agent-05.md",
+      "installedName": "conf-agent-05",
+      "description": "Generic conformance agent 5."
+    },
+    "agent-06": {
+      "id": "agent-06",
+      "sourcePath": "agents/agent-06.md",
+      "installedName": "conf-agent-06",
+      "description": "Generic conformance agent 6."
+    },
+    "agent-07": {
+      "id": "agent-07",
+      "sourcePath": "agents/agent-07.md",
+      "installedName": "conf-agent-07",
+      "description": "Generic conformance agent 7."
+    },
+    "agent-08": {
+      "id": "agent-08",
+      "sourcePath": "agents/agent-08.md",
+      "installedName": "conf-agent-08",
+      "description": "Generic conformance agent 8."
+    }
+  },
+  "rules": {
+    "rules/rule-01.md": {
+      "sourcePath": "rules/rule-01.md",
+      "description": "Generic conformance rule 1."
+    },
+    "rules/rule-02.md": {
+      "sourcePath": "rules/rule-02.md",
+      "description": "Generic conformance rule 2."
+    },
+    "rules/rule-03.md": {
+      "sourcePath": "rules/rule-03.md",
+      "description": "Generic conformance rule 3."
+    },
+    "rules/rule-04.md": {
+      "sourcePath": "rules/rule-04.md",
+      "description": "Generic conformance rule 4."
+    },
+    "rules/rule-05.md": {
+      "sourcePath": "rules/rule-05.md",
+      "description": "Generic conformance rule 5."
+    },
+    "rules/rule-06.md": {
+      "sourcePath": "rules/rule-06.md",
+      "description": "Generic conformance rule 6."
+    },
+    "rules/rule-07.md": {
+      "sourcePath": "rules/rule-07.md",
+      "description": "Generic conformance rule 7."
+    },
+    "rules/rule-08.md": {
+      "sourcePath": "rules/rule-08.md",
+      "description": "Generic conformance rule 8."
+    }
+  },
+  "bundles": {
+    "conf-bundle-01": {
+      "id": "conf-bundle-01",
+      "description": "Generic conformance bundle 01.",
+      "skills": [
+        "conf:skill-01",
+        "conf:skill-07"
+      ],
+      "agents": [
+        "agent-01"
+      ],
+      "rules": [
+        "rules/rule-01.md"
+      ]
+    },
+    "conf-bundle-02": {
+      "id": "conf-bundle-02",
+      "description": "Generic conformance bundle 02.",
+      "skills": [
+        "conf:skill-02",
+        "conf:skill-08"
+      ],
+      "agents": [
+        "agent-02"
+      ],
+      "rules": [
+        "rules/rule-02.md"
+      ]
+    },
+    "conf-bundle-03": {
+      "id": "conf-bundle-03",
+      "description": "Generic conformance bundle 03.",
+      "skills": [
+        "conf:skill-03",
+        "conf:skill-09"
+      ],
+      "agents": [
+        "agent-03"
+      ],
+      "rules": [
+        "rules/rule-03.md"
+      ]
+    },
+    "conf-bundle-04": {
+      "id": "conf-bundle-04",
+      "description": "Generic conformance bundle 04.",
+      "skills": [
+        "conf:skill-04",
+        "conf:skill-10"
+      ],
+      "agents": [
+        "agent-04"
+      ],
+      "rules": [
+        "rules/rule-04.md"
+      ]
+    },
+    "conf-bundle-05": {
+      "id": "conf-bundle-05",
+      "description": "Generic conformance bundle 05.",
+      "skills": [
+        "conf:skill-05",
+        "conf:skill-11"
+      ],
+      "agents": [
+        "agent-05"
+      ],
+      "rules": [
+        "rules/rule-05.md"
+      ]
+    },
+    "conf-bundle-06": {
+      "id": "conf-bundle-06",
+      "description": "Generic conformance bundle 06.",
+      "skills": [
+        "conf:skill-06",
+        "conf:skill-12"
+      ],
+      "agents": [
+        "agent-06"
+      ],
+      "rules": [
+        "rules/rule-06.md"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "skills": [
+    {
+      "id": "sample:demo-bundle-skill",
+      "category": "principle",
+      "profile": "bundle",
+      "description": "Bundle-profile skill that pulls in the sample agent + rule via dependencies.",
+      "installable": true,
+      "installed": false
+    },
+    {
+      "id": "sample:hello-world",
+      "category": "best-practice",
+      "profile": "standalone",
+      "description": "Minimal hello-world skill demonstrating the SKILL.md frontmatter contract.",
+      "installable": true,
+      "installed": false
+    }
+  ],
+  "bundles": [
+    {
+      "id": "sample-demo",
+      "description": "Demo bundle that installs the demo-bundle-skill plus its agent + rule dependencies.",
+      "skills": 1,
+      "agents": 1,
+      "rules": 0,
+      "installed": false
+    }
+  ],
+  "targetRoot": null,
+  "hasState": false
+}
