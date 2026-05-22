@@ -8,7 +8,7 @@ assets manually from a local checkout except as an emergency repair.
 1. Update `package.json` / `package-lock.json` with the next version:
 
    ```sh
-   npm version patch -m "chore(release): %s"
+   npm version patch --no-git-tag-version
    ```
 
    Use `minor` or `major` when the release scope warrants it.
@@ -26,6 +26,9 @@ assets manually from a local checkout except as an emergency repair.
 4. Push `main`, then push the tag:
 
    ```sh
+   git add package.json package-lock.json docs/release-notes/vX.Y.Z.md
+   git commit -m "chore(release): vX.Y.Z"
+   git tag -a vX.Y.Z -m "vX.Y.Z"
    git push origin main
    git push origin vX.Y.Z
    ```
