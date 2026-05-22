@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-302%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [为什么](#为什么用-nexel) · [快速开始](#快速开始) · [核心模型](#核心模型) · [参考](#参考) · [Agent 契约](#ai-agent-cli-契约) · [示例](./examples/sample-product/)
 
@@ -103,12 +103,55 @@ node scripts/install-skills.mjs
 npm run demo:install
 ```
 
-该 demo 复用 `examples/sample-product`,会先展示安装流程与 install plan,再把
-skills / agents / rules 以及 `.nexel/state.json` 写入临时 target 目录。默认
-不会写入 `~/.codex`、`~/.claude` 或 OpenCode 配置目录。自动化验证可用:
+![安装和卸载流程演示](./assets/install-uninstall-flow.gif)
+
+该 GIF 由 `npm run demo:gif` 录制真实命令生成。该 demo 复用
+`examples/sample-product`,展示正式产品安装器应该具备的流程:选择安装 /
+卸载 / 生命周期演示,选择一个或多个目标 agent CLI(Claude Code、Codex、
+OpenCode),选择 manifest bundle 或 skill,预览 plan,再写入或删除托管文件。
+它只写入 `/tmp/nexel-demo/agents/codex` 这样的临时沙盒,不会写入
+`~/.codex`、`~/.claude` 或 OpenCode 配置目录。
+
+可视化流程会展示这些阶段:
+
+```text
+1. Load ProductConfig from examples/sample-product/agent-skills.config.mjs
+2. Load manifest from examples/sample-product/sample.install.json
+3. Choose action: install / uninstall / lifecycle
+4. Choose target agent CLI(s): claude-code / codex / opencode
+5. Resolve selection
+6. Build install/uninstall plan for the sandbox target(s)
+7. Stage/promote files or remove managed files
+8. Write managed state to each agent target's .nexel/state.json
+```
+
+如需查看 demo 实际落盘内容:
 
 ```sh
-node scripts/install-skills.mjs --demo --yes --json --cleanup
+rm -rf /tmp/nexel-demo
+node scripts/install-skills.mjs --demo --yes --target /tmp/nexel-demo --agent codex
+find /tmp/nexel-demo -maxdepth 4 -type f -print
+```
+
+如需演示一次完整安装再卸载:
+
+```sh
+rm -rf /tmp/nexel-demo
+node scripts/install-skills.mjs --demo --action lifecycle --agent codex --target /tmp/nexel-demo
+```
+
+现场清理命令:
+
+```sh
+rm -rf /tmp/nexel-demo
+find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'nexel-demo-*' -prune -exec rm -rf {} +
+rm -f nexel-*.tgz nexel-*.tgz.sha256
+```
+
+自动化验证并清理可用:
+
+```sh
+node scripts/install-skills.mjs --demo --yes --json --cleanup --action lifecycle --agent codex
 ```
 
 同一个 sample product 也可以作为普通产品 bin 直接驱动:

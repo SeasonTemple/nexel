@@ -36,9 +36,11 @@
   "files": [
     "scripts/installer/**/*.mjs",
     "scripts/install-skills.mjs",
+    "scripts/render-install-demo-gif.mjs",
     "scripts/lint-skills.mjs",
     "scripts/install-husky.mjs",
     "examples/sample-product/**",
+    "assets/**",
     "README.md",
     "LICENSE",
     "scripts/build-dist.mjs",
@@ -51,6 +53,7 @@
   ],
   "scripts": {
     "demo:install": "node scripts/install-skills.mjs",
+    "demo:gif": "node scripts/render-install-demo-gif.mjs",
     "lint:skills": "node scripts/lint-skills.mjs --dir=examples/sample-product/skills --id-prefix=sample",
     "lint:manifest": "node scripts/installer/core/manifest/validator.mjs --manifest=examples/sample-product/sample.install.json",
     "lint:drift": "node scripts/installer/core/manifest/drift.mjs --manifest=examples/sample-product/sample.install.json",

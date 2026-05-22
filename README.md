@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-302%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Getting started](#getting-started) · [Core model](#core-model) · [Reference](#reference) · [Agent contract](#agent-cli-contract) · [Examples](./examples/sample-product/)
 
@@ -107,13 +107,56 @@ node scripts/install-skills.mjs
 npm run demo:install
 ```
 
-The demo uses `examples/sample-product`, previews the install plan, then writes
-skills / agents / rules plus `.nexel/state.json` into a temporary target
-directory. It does not write to `~/.codex`, `~/.claude`, or OpenCode config
-directories by default. For automated verification:
+![Install and uninstall flow demo](./assets/install-uninstall-flow.gif)
+
+The GIF is recorded from the real command above via `npm run demo:gif`. The
+demo uses `examples/sample-product` and walks through the same shape a real
+product installer should expose: choose install / uninstall / lifecycle, choose
+one or more target agent CLIs (Claude Code, Codex, OpenCode), choose a manifest
+bundle or skill, preview the plan, then write or remove managed files. It writes
+only into a temporary sandbox such as `/tmp/nexel-demo/agents/codex`, not to
+`~/.codex`, `~/.claude`, or OpenCode config directories.
+
+The visual flow shows these stages:
+
+```text
+1. Load ProductConfig from examples/sample-product/agent-skills.config.mjs
+2. Load manifest from examples/sample-product/sample.install.json
+3. Choose action: install / uninstall / lifecycle
+4. Choose target agent CLI(s): claude-code / codex / opencode
+5. Resolve selection
+6. Build install/uninstall plan for the sandbox target(s)
+7. Stage/promote files or remove managed files
+8. Write managed state to each agent target's .nexel/state.json
+```
+
+To inspect the demo output on disk:
 
 ```sh
-node scripts/install-skills.mjs --demo --yes --json --cleanup
+rm -rf /tmp/nexel-demo
+node scripts/install-skills.mjs --demo --yes --target /tmp/nexel-demo --agent codex
+find /tmp/nexel-demo -maxdepth 4 -type f -print
+```
+
+To demo install and uninstall in one safe run:
+
+```sh
+rm -rf /tmp/nexel-demo
+node scripts/install-skills.mjs --demo --action lifecycle --agent codex --target /tmp/nexel-demo
+```
+
+Cleanup commands:
+
+```sh
+rm -rf /tmp/nexel-demo
+find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'nexel-demo-*' -prune -exec rm -rf {} +
+rm -f nexel-*.tgz nexel-*.tgz.sha256
+```
+
+For automated verification with cleanup:
+
+```sh
+node scripts/install-skills.mjs --demo --yes --json --cleanup --action lifecycle --agent codex
 ```
 
 The same sample product can also be driven directly as a normal product bin:

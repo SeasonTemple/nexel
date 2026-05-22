@@ -13,8 +13,13 @@ import {
   defaultManifestPath,
   formatPlanText,
   install,
+  installMulti,
+  listAdapterStatus,
   loadManifest,
+  uninstall,
+  uninstallMulti,
 } from "./installer/index.mjs";
+import { readState } from "./installer/core/filesystem.mjs";
 import {
   CancelledError,
   confirmPlan,
@@ -53,6 +58,8 @@ function parseDemoArgs(argv) {
     json: false,
     cleanup: false,
     noBanner: false,
+    action: null,
+    adapterIds: [],
     target: null,
     selectionIds: [],
   };
@@ -64,6 +71,17 @@ function parseDemoArgs(argv) {
     if (x === "--json") { out.json = true; continue; }
     if (x === "--cleanup") { out.cleanup = true; continue; }
     if (x === "--no-banner") { out.noBanner = true; continue; }
+    if (x === "--action") { out.action = argv[++i]; continue; }
+    if (x.startsWith("--action=")) { out.action = x.slice(9); continue; }
+    if (x === "--agent" || x === "-a") {
+      const value = argv[++i];
+      out.adapterIds.push(...value.split(",").map((s) => s.trim()).filter(Boolean));
+      continue;
+    }
+    if (x.startsWith("--agent=")) {
+      out.adapterIds.push(...x.slice(8).split(",").map((s) => s.trim()).filter(Boolean));
+      continue;
+    }
     if (x === "--target") { out.target = argv[++i]; continue; }
     if (x.startsWith("--target=")) { out.target = x.slice(9); continue; }
     if (x === "--selection") { out.selectionIds.push(argv[++i]); continue; }
@@ -86,8 +104,10 @@ Usage:
 
 Demo flags:
   --demo                 Run the safe sample install demo explicitly
+  --action <name>        install, uninstall, or lifecycle (install then uninstall)
+  --agent <id>           claude-code, codex, opencode; repeat or comma-separate
   --selection <id>       sample-demo or sample:hello-world
-  --target <path>        Install into this target root instead of a temp dir
+  --target <path>        Use this demo sandbox root instead of a temp dir
   --yes, -y              Skip the interactive confirmation
   --json                 Emit a machine-readable result envelope
   --cleanup              Remove the demo target after a successful run
@@ -97,11 +117,12 @@ Demo flags:
 Examples:
   node scripts/install-skills.mjs
   node scripts/install-skills.mjs --demo --yes --json --cleanup
+  node scripts/install-skills.mjs --demo --action lifecycle --agent codex --target /tmp/nexel-demo
   node scripts/install-skills.mjs list --json
   node scripts/install-skills.mjs plan --target /tmp/nexel-demo --bundle sample-demo
 
 The demo reuses examples/sample-product. By default it writes to a temporary
-target under ${os.tmpdir()}, not to ~/.codex, ~/.claude, or ~/.config/opencode.
+sandbox under ${os.tmpdir()}, not to ~/.codex, ~/.claude, or ~/.config/opencode.
 `);
 }
 
@@ -119,6 +140,25 @@ function makeTempTarget() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "nexel-demo-"));
 }
 
+function makeExecutableShim(file) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+}
+
+function createDemoEnv(demoRoot) {
+  const binDir = path.join(demoRoot, ".bin");
+  for (const name of ["claude", "codex", "opencode"]) {
+    makeExecutableShim(path.join(binDir, name));
+  }
+  return {
+    ...process.env,
+    PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
+    CLAUDE_HOME: path.join(demoRoot, "agents", "claude-code"),
+    CODEX_HOME: path.join(demoRoot, "agents", "codex"),
+    OPENCODE_CONFIG_DIR: path.join(demoRoot, "agents", "opencode"),
+  };
+}
+
 function relPathForDisplay(targetRoot, absPath) {
   return path.relative(targetRoot, absPath).split(path.sep).join("/");
 }
@@ -134,7 +174,8 @@ export function listDemoFiles(targetRoot) {
       if (entry.isDirectory()) {
         stack.push(abs);
       } else if (entry.isFile()) {
-        out.push(relPathForDisplay(targetRoot, abs));
+        const rel = relPathForDisplay(targetRoot, abs);
+        if (!rel.startsWith(".bin/")) out.push(rel);
       }
     }
   }
@@ -153,13 +194,199 @@ export function formatDemoFlow({ targetRoot, selectionIds, temporary = true }) {
   ].join("\n");
 }
 
-async function chooseSelections({ manifest, prompts = clack } = {}) {
+export function formatLifecycleFlow({ action, demoRoot, adapterIds, selectionIds, temporary = true }) {
+  const rootLabel = temporary ? "temporary sandbox" : "demo sandbox";
+  return [
+    "1. Load ProductConfig from examples/sample-product/agent-skills.config.mjs",
+    "2. Load manifest from examples/sample-product/sample.install.json",
+    `3. Choose action: ${action}`,
+    `4. Choose target agent CLI(s): ${adapterIds.join(", ")}`,
+    `5. Resolve selection: ${selectionIds.join(", ")}`,
+    `6. Build install/uninstall plan under ${rootLabel}: ${demoRoot}`,
+    "7. Stage/promote files or remove managed files",
+    "8. Update managed state in each agent's .nexel/state.json",
+  ].join("\n");
+}
+
+function formatMultiInstallPlan(dryRun) {
+  if (dryRun.results) {
+    return dryRun.results.map((entry) => {
+      if (!entry.ok) return `${entry.adapterId}: ${entry.error?.code || "error"} — ${entry.error?.message || ""}`;
+      const plan = entry.result?.plan;
+      const target = plan?.targetRoot || entry.result?.targetRoot || "(unknown target)";
+      return [`Agent: ${entry.adapterId}`, `Target: ${target}`, "", formatPlanText(plan)].join("\n");
+    }).join("\n\n");
+  }
+  return formatPlanText(dryRun.plan);
+}
+
+function formatUninstallPlan(dryRun) {
+  const formatOne = (adapterId, result) => {
+    const lines = [`Agent: ${adapterId}`, `would delete ${result.toDelete?.length ?? 0} file(s):`];
+    for (const rel of result.toDelete || []) lines.push(`  - ${rel}`);
+    return lines.join("\n");
+  };
+  if (dryRun.results) {
+    return dryRun.results.map((entry) => {
+      if (!entry.ok) return `${entry.adapterId}: ${entry.error?.code || "error"} — ${entry.error?.message || ""}`;
+      return formatOne(entry.adapterId, entry.result);
+    }).join("\n\n");
+  }
+  return formatOne(dryRun.adapterId || "custom", dryRun);
+}
+
+function targetSummary(adapterIds, env) {
+  const statuses = listAdapterStatus({ env });
+  return adapterIds.map((id) => {
+    const status = statuses.find((s) => s.id === id);
+    return {
+      adapterId: id,
+      displayName: status?.displayName || id,
+      targetRoot: status?.targetRoot || "",
+    };
+  });
+}
+
+async function chooseAction({ prompts = clack } = {}) {
   prompts.intro("nexel sample-product installer demo");
+  const action = await prompts.select({
+    message: "What would you like to demo?",
+    options: [
+      { value: "install", label: "Install  —  choose agent CLI(s), preview, then write managed files" },
+      { value: "uninstall", label: "Uninstall  —  choose agent CLI(s), preview, then remove managed files" },
+      { value: "lifecycle", label: "Lifecycle  —  install, then uninstall from the same sandbox" },
+    ],
+    initialValue: "install",
+  });
+  if (prompts.isCancel(action)) throw new CancelledError("demo-action");
+  return action;
+}
+
+async function chooseAgents({ env, prompts = clack } = {}) {
+  const adapters = listAdapterStatus({ env }).filter((a) => a.supportsDirect);
+  const selected = await prompts.multiselect({
+    message: "Target agent CLI(s) — space toggle, enter confirm",
+    options: adapters.map((a) => ({
+      value: a.id,
+      label: `${a.displayName}  (${a.targetRoot})`,
+      hint: `sandboxed demo target | cli=yes`,
+    })),
+    required: true,
+    initialValues: ["codex"],
+  });
+  if (prompts.isCancel(selected)) throw new CancelledError("demo-agent");
+  return Array.isArray(selected) ? selected : [selected];
+}
+
+async function seedForUninstall({ repoRoot, env, adapterIds, selectionIds, version }) {
+  if (adapterIds.length > 1) {
+    await installMulti({
+      repoRoot,
+      adapterIds,
+      selectionIds,
+      installerVersion: version,
+      allowNoCli: true,
+      requestedBy: "interactive",
+      productConfig,
+      env,
+    });
+    return;
+  }
+  await install({
+    repoRoot,
+    adapterId: adapterIds[0],
+    selectionIds,
+    installerVersion: version,
+    allowNoCli: true,
+    requestedBy: "interactive",
+    productConfig,
+    env,
+  });
+}
+
+async function performInstall({ env, adapterIds, selectionIds, yes, json, prompts }) {
+  const common = {
+    repoRoot: SAMPLE_ROOT,
+    selectionIds,
+    installerVersion: PKG.version,
+    allowNoCli: true,
+    requestedBy: "interactive",
+    productConfig,
+    env,
+  };
+  const dryRun = adapterIds.length > 1
+    ? await installMulti({ ...common, adapterIds, dryRun: true })
+    : await install({ ...common, adapterId: adapterIds[0], dryRun: true });
+  const planText = formatMultiInstallPlan(dryRun);
+  if (!yes) {
+    const ok = await confirmPlan({
+      planText,
+      prompts,
+      message: "Install this sample selection into the selected sandbox agent CLI target(s)?",
+      noteTitle: "Install plan",
+    });
+    if (!ok) throw new CancelledError("demo-install-confirm");
+  } else if (!json) {
+    prompts.note(planText, "Install plan");
+  }
+
+  const spinner = json ? null : startSpinner({ prompts, label: "Installing sample assets" });
+  try {
+    const result = adapterIds.length > 1
+      ? await installMulti({ ...common, adapterIds })
+      : await install({ ...common, adapterId: adapterIds[0] });
+    spinner?.stop("Demo install complete");
+    return result;
+  } catch (e) {
+    spinner?.stop("Demo install failed", 1);
+    throw e;
+  }
+}
+
+async function performUninstall({ env, adapterIds, selectionIds, yes, json, prompts }) {
+  const common = {
+    repoRoot: SAMPLE_ROOT,
+    selectionIds,
+    installerVersion: PKG.version,
+    force: false,
+    productConfig,
+    env,
+  };
+  const dryRun = adapterIds.length > 1
+    ? await uninstallMulti({ ...common, adapterIds, dryRun: true })
+    : await uninstall({ ...common, adapterId: adapterIds[0], dryRun: true });
+  const planText = formatUninstallPlan(dryRun);
+  if (!yes) {
+    const ok = await confirmPlan({
+      planText,
+      prompts,
+      message: "Uninstall this sample selection from the selected sandbox agent CLI target(s)?",
+      noteTitle: "Uninstall plan",
+    });
+    if (!ok) throw new CancelledError("demo-uninstall-confirm");
+  } else if (!json) {
+    prompts.note(planText, "Uninstall plan");
+  }
+
+  const spinner = json ? null : startSpinner({ prompts, label: "Removing managed sample assets" });
+  try {
+    const result = adapterIds.length > 1
+      ? await uninstallMulti({ ...common, adapterIds })
+      : await uninstall({ ...common, adapterId: adapterIds[0] });
+    spinner?.stop("Demo uninstall complete");
+    return result;
+  } catch (e) {
+    spinner?.stop("Demo uninstall failed", 1);
+    throw e;
+  }
+}
+
+async function chooseSelections({ manifest, prompts = clack } = {}) {
   const installable = DEMO_SELECTIONS.filter((option) => {
     return manifest.bundles?.[option.value] || manifest.skills?.[option.value];
   });
   const selected = await prompts.select({
-    message: "Choose what to install into the temporary demo target",
+    message: "Choose what to install or uninstall",
     options: installable,
     initialValue: "sample-demo",
   });
@@ -167,8 +394,16 @@ async function chooseSelections({ manifest, prompts = clack } = {}) {
   return [selected];
 }
 
+function resultOk(result) {
+  if (!result) return true;
+  if (typeof result.failCount === "number") return result.failCount === 0;
+  return result.ok !== false;
+}
+
 export async function runDemoInstall({
   selectionIds = [],
+  adapterIds = [],
+  action = null,
   target = null,
   yes = false,
   json = false,
@@ -187,76 +422,84 @@ export async function runDemoInstall({
 
   try {
     const manifest = loadManifest(defaultManifestPath(SAMPLE_ROOT, productConfig));
+    const env = createDemoEnv(targetRoot);
     if (!json) {
       renderBanner({ title: "nexel demo", version: PKG.version, enabled: !noBanner });
     }
+    const chosenAction = action || (yes ? "install" : await chooseAction({ prompts }));
     const chosenSelectionIds = selectionIds.length > 0
       ? selectionIds
       : yes
         ? ["sample-demo"]
         : await chooseSelections({ manifest, prompts });
+    const chosenAdapterIds = adapterIds.length > 0
+      ? [...new Set(adapterIds)]
+      : yes
+        ? ["codex"]
+        : await chooseAgents({ env, prompts });
 
     if (!json) {
-      prompts.note(formatDemoFlow({ targetRoot, selectionIds: chosenSelectionIds, temporary: target === null }), "Demo flow");
+      prompts.note(
+        formatLifecycleFlow({
+          action: chosenAction,
+          demoRoot: targetRoot,
+          adapterIds: chosenAdapterIds,
+          selectionIds: chosenSelectionIds,
+          temporary: target === null,
+        }),
+        "Demo flow"
+      );
+      const targets = targetSummary(chosenAdapterIds, env)
+        .map((t) => `  - ${t.displayName}: ${t.targetRoot}`)
+        .join("\n");
+      prompts.note(targets, "Sandbox agent targets");
     }
 
-    const dryRun = await install({
-      repoRoot: SAMPLE_ROOT,
-      target: targetRoot,
-      selectionIds: chosenSelectionIds,
-      installerVersion: PKG.version,
-      productConfig,
-      dryRun: true,
-      allowNoCli: true,
-      requestedBy: "interactive",
-    });
-    const planText = formatPlanText(dryRun.plan);
+    const installResult = ["install", "lifecycle"].includes(chosenAction)
+      ? await performInstall({ env, adapterIds: chosenAdapterIds, selectionIds: chosenSelectionIds, yes, json, prompts })
+      : null;
 
-    if (!yes) {
-      const ok = await confirmPlan({
-        planText,
-        prompts,
-        message: "Install this sample selection into the temporary demo target?",
-        noteTitle: "Install plan",
-      });
-      if (!ok) throw new CancelledError("demo-confirm");
-    } else if (!json) {
-      prompts.note(planText, "Install plan");
-    }
-
-    const spinner = json ? null : startSpinner({ prompts, label: "Installing sample assets" });
-    let result;
-    try {
-      result = await install({
+    if (chosenAction === "uninstall") {
+      await seedForUninstall({
         repoRoot: SAMPLE_ROOT,
-        target: targetRoot,
+        env,
+        adapterIds: chosenAdapterIds,
         selectionIds: chosenSelectionIds,
-        installerVersion: PKG.version,
-        productConfig,
-        allowNoCli: true,
-        requestedBy: "interactive",
+        version: PKG.version,
       });
-      spinner?.stop("Demo install complete");
-    } catch (e) {
-      spinner?.stop("Demo install failed", 1);
-      throw e;
     }
+
+    const uninstallResult = ["uninstall", "lifecycle"].includes(chosenAction)
+      ? await performUninstall({ env, adapterIds: chosenAdapterIds, selectionIds: chosenSelectionIds, yes, json, prompts })
+      : null;
 
     const files = listDemoFiles(targetRoot);
-    const statePath = path.join(targetRoot, ".nexel", "state.json");
+    const targets = targetSummary(chosenAdapterIds, env).map((t) => ({
+      ...t,
+      writtenCount: installResult?.results
+        ? (installResult.results.find((r) => r.adapterId === t.adapterId)?.result?.writtenCount ?? 0)
+        : (installResult?.writtenCount ?? 0),
+      state: readState(t.targetRoot),
+    }));
 
     if (cleanup) {
       cleanupTarget();
     }
 
     const envelope = {
-      ok: result.ok,
+      ok: resultOk(installResult) && resultOk(uninstallResult),
       targetRoot,
       cleaned,
+      action: chosenAction,
+      adapterIds: chosenAdapterIds,
       selectionIds: chosenSelectionIds,
-      writtenCount: result.writtenCount ?? 0,
-      skippedCount: result.skippedCount ?? 0,
-      statePath,
+      writtenCount: installResult?.results
+        ? installResult.results.reduce((sum, r) => sum + (r.result?.writtenCount ?? 0), 0)
+        : (installResult?.writtenCount ?? 0),
+      removedCount: uninstallResult?.results
+        ? uninstallResult.results.reduce((sum, r) => sum + (r.result?.toDelete?.length ?? 0), 0)
+        : (uninstallResult?.toDelete?.length ?? 0),
+      targets,
       files,
     };
 
@@ -268,12 +511,7 @@ export async function runDemoInstall({
     prompts.note(files.map((f) => `  ${f}`).join("\n"), "Demo target files");
     renderNextSteps({
       prompts,
-      targets: [{
-        adapterId: "sample-target",
-        displayName: "Temporary demo target",
-        targetRoot,
-        writtenCount: result.writtenCount ?? 0,
-      }],
+      targets,
       selectionIds: chosenSelectionIds,
     });
     if (cleanup) {
@@ -301,6 +539,8 @@ async function main() {
   }
   await runDemoInstall({
     selectionIds: parsed.selectionIds,
+    adapterIds: parsed.adapterIds,
+    action: parsed.action,
     target: parsed.target,
     yes: parsed.yes,
     json: parsed.json,

@@ -31,6 +31,8 @@ assets manually from a local checkout except as an emergency repair.
    npm test
    npm run release:preflight
    node scripts/verify-release-tag.mjs vX.Y.Z
+   npm run dist
+   rm -f nexel-*.tgz nexel-*.tgz.sha256
    ```
 
 4. Push `main`, then push the tag:
@@ -81,6 +83,26 @@ rm -f nexel-X.Y.Z.tgz nexel-X.Y.Z.tgz.sha256
 ```
 
 Prefer fixing the workflow before publishing the next tag.
+
+## Local setup checks
+
+`npm install` configures the local commit template. To check or repair it:
+
+```sh
+git config --get commit.template
+git config commit.template .gitmessage
+```
+
+To inspect local commit/tag signing state and GitHub `Verified` readiness:
+
+```sh
+git log --show-signature --oneline -12
+git tag -v vX.Y.Z
+git config --get commit.gpgsign
+git config --get tag.gpgsign
+git config --get gpg.format
+git config --get user.signingkey
+```
 
 ## Repository settings
 
