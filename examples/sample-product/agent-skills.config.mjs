@@ -24,6 +24,7 @@ export default defineProductConfig({
   // namespace so two products on the same machine can coexist without
   // clobbering each other's profile / telemetry / banner state.
   envProfile: "SAMPLE_PROFILE",
+  envLocale: "SAMPLE_LANG",
   envTelemetry: "SAMPLE_TELEMETRY",
   envBannerTitle: "SAMPLE_BANNER_TITLE",
   telemetryDirName: ".sample-installer",

@@ -51,6 +51,7 @@ export function parseArgs(argv, { validVerbs } = {}) {
     printPath: null,
     apply: false,
     profile: null,
+    lang: null,
     positional: [],
   };
   for (let i = 0; i < a.length; i++) {
@@ -65,6 +66,8 @@ export function parseArgs(argv, { validVerbs } = {}) {
     if (x === "--apply") { out.apply = true; continue; }
     if (x === "--profile") { out.profile = a[++i]; continue; }
     if (x.startsWith("--profile=")) { out.profile = x.slice(10); continue; }
+    if (x === "--lang") { out.lang = a[++i]; continue; }
+    if (x.startsWith("--lang=")) { out.lang = x.slice(7); continue; }
     if (x === "--skill" || x === "-s") {
       while (i + 1 < a.length && !a[i + 1].startsWith("-")) out.skills.push(a[++i]);
       continue;

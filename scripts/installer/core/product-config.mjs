@@ -8,6 +8,7 @@
 //   - defaultSkillsDir / defaultAgentsDir / defaultRulesDir
 //   - targetPathLayout
 //   - envProfile / envBannerTitle
+//   - envLocale
 //
 // `defineProductConfig({...})` is the canonical constructor. It:
 //   - Rejects missing required fields with ERR_INVALID_PRODUCT_CONFIG, listing
@@ -39,6 +40,7 @@ import {
  * @property {{ skills: string, agents: string }} targetPathLayout
  * @property {string|undefined} envProfile
  * @property {string|undefined} envBannerTitle
+ * @property {string|undefined} envLocale
  */
 
 const REQUIRED_FIELDS = Object.freeze([
@@ -56,6 +58,7 @@ const OPTIONAL_DEFAULTS = Object.freeze({
   targetPathLayout: Object.freeze({ skills: "skills", agents: "agents" }),
   envProfile: undefined,
   envBannerTitle: undefined,
+  envLocale: undefined,
 });
 
 /**
@@ -134,6 +137,7 @@ export function defineProductConfig(overrides) {
     }),
     envProfile: overrides.envProfile ?? OPTIONAL_DEFAULTS.envProfile,
     envBannerTitle: overrides.envBannerTitle ?? OPTIONAL_DEFAULTS.envBannerTitle,
+    envLocale: overrides.envLocale ?? OPTIONAL_DEFAULTS.envLocale,
   });
 }
 

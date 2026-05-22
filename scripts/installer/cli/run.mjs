@@ -119,16 +119,16 @@ export async function runValidate(args, ctx) {
   const { extractFrontmatter, validateSkill } = await import("../../lint-skills.mjs");
   if (args.positional.length === 0) {
     const bin = ctx.productConfig?.binName ?? "installer";
-    process.stderr.write(`error: validate requires a SKILL.md path\nusage: ${bin} validate <path/to/SKILL.md>\n`);
+    process.stderr.write(strings.run.validateUsage({ binName: bin }) + "\n");
     process.exit(2);
   }
   const target = path.resolve(args.positional[0]);
   if (!fs.existsSync(target)) {
-    process.stderr.write(`error: file not found: ${target}\n`);
+    process.stderr.write(strings.run.validateFileMissing({ target }) + "\n");
     process.exit(2);
   }
   if (path.basename(target) !== "SKILL.md") {
-    process.stderr.write(`note: file is not named SKILL.md (got: ${path.basename(target)}); proceeding anyway\n`);
+    process.stderr.write(strings.run.validateNotSkillMd({ basename: path.basename(target) }) + "\n");
   }
   const dirname = path.basename(path.dirname(target));
   const raw = fs.readFileSync(target, "utf8");
@@ -140,10 +140,10 @@ export async function runValidate(args, ctx) {
     process.exit(findings.length === 0 ? 0 : 1);
   }
   if (findings.length === 0) {
-    process.stdout.write(`OK ${target} (validated as dirname=${dirname})\n`);
+    process.stdout.write(strings.run.validateOk({ target, dirname }) + "\n");
     return;
   }
-  process.stderr.write(`FAIL ${target} (validated as dirname=${dirname}):\n`);
+  process.stderr.write(strings.run.validateFail({ target, dirname }) + "\n");
   for (const f of findings) {
     process.stderr.write(`  [${f.severity}] ${f.message}\n`);
   }

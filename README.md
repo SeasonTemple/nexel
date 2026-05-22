@@ -64,16 +64,26 @@ vendoring:
 
 ```sh
 # git dependency (package.json), pinned to a release tag
-npm install "git+https://github.com/<owner>/nexel.git#v0.3.0"
+npm install "git+https://github.com/<owner>/nexel.git#v0.6.0"
 ```
 
 ```sh
 # or clone + pin
-git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.3.0
+git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.6.0
 ```
 
 Requires Node ≥ 18, ESM only. Per-tag release notes live in
 [`docs/release-notes/`](./docs/release-notes/).
+
+Local release artifacts can be produced without publishing to npm:
+
+```sh
+npm run release:preflight
+npm run dist
+```
+
+`dist` writes `nexel-<version>.tgz` plus a `.sha256` checksum. Remote release
+publishing remains a consuming product decision.
 
 ### For humans — run or build a product
 
@@ -106,6 +116,9 @@ accepts `--json` (a structured stdout envelope), `--yes` skips prompts, and
 the exit-code contract is stable. The full product-agnostic behavioral
 contract is [`docs/AGENT-CLI-CONTRACT.md`](./docs/AGENT-CLI-CONTRACT.md),
 detailed in the [Agent CLI contract](#agent-cli-contract) section.
+
+Human-facing output can be pinned with `--lang en|zh`, `NEXEL_LANG`, or a
+product-specific locale env var. JSON keys and error codes do not localize.
 
 ## Core model
 
@@ -234,6 +247,24 @@ Downstream products supply additional adapters via
 Optional fields are filled from `SPI_DEFAULTS` when omitted. Canonical
 contract: [`scripts/installer/adapters/spi.mjs`](./scripts/installer/adapters/spi.mjs).
 Complete worked adapter: [`scripts/installer/adapters/claude.mjs`](./scripts/installer/adapters/claude.mjs).
+
+### OpenCode Direct And Plugin Mode
+
+OpenCode has two product-agnostic integration paths:
+
+- Direct install is handled by the OpenCode Adapter. It writes skills under
+  `skills/`, translated agents under `agent/`, and rule reference files at
+  their manifest paths. It does not write `AGENTS.md`.
+- Plugin mode is handled by an OpenCode plugin in the consuming product. A
+  plugin can import `configureOpenCode` from `nexel/adapters/opencode-plugin`
+  and call it with its installed `skills` directory. The helper appends that
+  directory to `config.skills.paths` and adds any skill frontmatter
+  `opencode-instructions: <skill-relative-path>` files to
+  `config.instructions`.
+
+`opencode-instructions` is Skill Metadata, not a Manifest entry and not a new
+Asset type. The referenced file must stay inside the declaring skill directory.
+See [`examples/sample-product/.opencode/plugins/sample-product.js`](./examples/sample-product/.opencode/plugins/sample-product.js).
 
 ### Verbs & flags
 

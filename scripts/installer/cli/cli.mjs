@@ -24,6 +24,7 @@ import { printHelp, renderHelp } from "./help.mjs";
 import { handleError } from "./error-format.mjs";
 import { dispatchVerb, KERNEL_HANDLERS } from "./dispatch.mjs";
 import { CancelledError } from "./prompts.mjs";
+import { applyLocale } from "./locale.mjs";
 
 const DEFAULT_VERBS = new Set([
   ...Object.keys(KERNEL_HANDLERS),
@@ -81,6 +82,7 @@ export function createCli({
         throw new Error("createCli.run(argv): argv must be an array");
       }
       const args = parseArgs(argv, { validVerbs: verbs });
+      applyLocale({ args, env: process.env, productConfig });
       if (args.help || args.verb === "help") {
         // No stream passed — renderHelp's stream=process.stdout default
         // resolves it. Verb-scoped (`<verb> --help`, `help <verb>`) routes
@@ -100,7 +102,8 @@ export function createCli({
         process.exit(0);
       } catch (e) {
         if (e instanceof CancelledError) {
-          process.stderr.write(`cancelled at ${e.stage}\n`);
+          const { strings } = await import("./strings.mjs");
+          process.stderr.write(strings.errors.cancelled({ stage: e.stage }) + "\n");
           process.exit(130);
         }
         handleError(e, args);
