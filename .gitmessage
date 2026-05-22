@@ -1,0 +1,10 @@
+<type>(<scope>): <summary>
+
+Types: feat, fix, docs, test, refactor, perf, build, ci, chore, release
+Scope: short kebab-case area, for example release, demo, cli, opencode
+Summary: imperative/lowercase start, <= 72 characters including header
+
+Examples:
+docs(release): require bilingual release notes
+test(sample): make agent CLI detection deterministic
+release: v0.6.2

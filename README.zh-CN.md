@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-292%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-302%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [为什么](#为什么用-nexel) · [快速开始](#快速开始) · [核心模型](#核心模型) · [参考](#参考) · [Agent 契约](#ai-agent-cli-契约) · [示例](./examples/sample-product/)
 

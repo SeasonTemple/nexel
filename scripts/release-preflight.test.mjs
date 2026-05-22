@@ -7,7 +7,18 @@ import { spawnSync } from "node:child_process";
 
 import { runPreflight } from "./release-preflight.mjs";
 
-function makeRepo({ version = "0.9.0", lockVersion = version, noteVersion = version, noteBody = "note\n" } = {}) {
+const BILINGUAL_NOTE = `# v0.9.0
+
+## English
+
+- Release note.
+
+## 中文
+
+- 发布说明。
+`;
+
+function makeRepo({ version = "0.9.0", lockVersion = version, noteVersion = version, noteBody = BILINGUAL_NOTE } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nexel-preflight-"));
   spawnSync("git", ["init"], { cwd: root, stdio: "ignore" });
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "nexel", version }, null, 2));
@@ -71,6 +82,17 @@ test("runPreflight fails dirty tree unless allowed", () => {
     fs.writeFileSync(path.join(root, "dirty.txt"), "dirty");
     assert.equal(runPreflight({ repoRoot: root }).ok, false);
     assert.equal(runPreflight({ repoRoot: root, allowDirty: true }).mismatches.some((m) => m.name === "working-tree-clean"), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runPreflight fails when current release note is not bilingual", () => {
+  const root = makeRepo({ noteBody: "# v0.9.0\n\n## English\n\n- English only.\n" });
+  try {
+    const result = runPreflight({ repoRoot: root });
+    assert.equal(result.ok, false);
+    assert.ok(result.mismatches.some((m) => m.name === "release-note-bilingual"));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

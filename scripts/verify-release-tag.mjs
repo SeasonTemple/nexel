@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { validateBilingualReleaseNote } from "./release-note-policy.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -24,8 +25,14 @@ export function verifyReleaseTag({ tagName, repoRoot = REPO_ROOT } = {}) {
   const notePath = path.join(repoRoot, "docs", "release-notes", `${expectedTag}.md`);
   if (!fs.existsSync(notePath)) {
     failures.push(`missing release note: docs/release-notes/${expectedTag}.md`);
-  } else if (fs.readFileSync(notePath, "utf8").trim().length === 0) {
-    failures.push(`empty release note: docs/release-notes/${expectedTag}.md`);
+  } else {
+    const noteText = fs.readFileSync(notePath, "utf8");
+    if (noteText.trim().length === 0) {
+      failures.push(`empty release note: docs/release-notes/${expectedTag}.md`);
+    }
+    for (const failure of validateBilingualReleaseNote(noteText).failures) {
+      failures.push(`release note policy: ${failure}`);
+    }
   }
 
   return {

@@ -6,7 +6,18 @@ import path from "node:path";
 
 import { verifyReleaseTag } from "./verify-release-tag.mjs";
 
-function makeFixture({ version = "1.2.3", note = "release note\n" } = {}) {
+const BILINGUAL_NOTE = `# v1.2.3
+
+## English
+
+- Release note.
+
+## 中文
+
+- 发布说明。
+`;
+
+function makeFixture({ version = "1.2.3", note = BILINGUAL_NOTE } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nexel-release-tag-"));
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "nexel", version }, null, 2));
   fs.mkdirSync(path.join(root, "docs", "release-notes"), { recursive: true });
@@ -65,5 +76,16 @@ test("verifyReleaseTag fails when the matching release note is missing or empty"
     assert.ok(result.failures.some((failure) => failure.includes("empty release note")));
   } finally {
     fs.rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("verifyReleaseTag fails when the release note is not bilingual", () => {
+  const root = makeFixture({ note: "# v1.2.3\n\n## English\n\n- English only.\n" });
+  try {
+    const result = verifyReleaseTag({ tagName: "v1.2.3", repoRoot: root });
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((failure) => failure.includes("Chinese")));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

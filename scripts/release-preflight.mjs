@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+import { validateBilingualReleaseNote } from "./release-note-policy.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -50,8 +51,11 @@ export function runPreflight({ repoRoot = REPO_ROOT, allowDirty = false } = {}) 
   add("package-lock-version-matches", lock.version === version && lock.packages?.[""]?.version === version,
     `package=${version} lock=${lock.version} root=${lock.packages?.[""]?.version}`);
   add("release-note-exists", fs.existsSync(releaseNotePath), `docs/release-notes/v${version}.md`);
-  add("release-note-non-empty", fs.existsSync(releaseNotePath) && fs.readFileSync(releaseNotePath, "utf8").trim().length > 0,
-    `docs/release-notes/v${version}.md`);
+  const releaseNoteText = fs.existsSync(releaseNotePath) ? fs.readFileSync(releaseNotePath, "utf8") : "";
+  add("release-note-non-empty", releaseNoteText.trim().length > 0, `docs/release-notes/v${version}.md`);
+  const bilingual = validateBilingualReleaseNote(releaseNoteText);
+  add("release-note-bilingual", bilingual.ok,
+    bilingual.ok ? "English and Chinese sections present" : bilingual.failures.join("; "));
   add("newest-release-note-matches-package", newest === version,
     `package=${version} newest=${newest ?? "(none)"}`);
 

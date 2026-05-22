@@ -13,7 +13,17 @@ assets manually from a local checkout except as an emergency repair.
 
    Use `minor` or `major` when the release scope warrants it.
 
-2. Write `docs/release-notes/vX.Y.Z.md`.
+2. Write `docs/release-notes/vX.Y.Z.md` with both required language sections:
+
+   ```md
+   ## English
+
+   ...
+
+   ## 中文
+
+   ...
+   ```
 
 3. Validate locally:
 
@@ -27,7 +37,7 @@ assets manually from a local checkout except as an emergency repair.
 
    ```sh
    git add package.json package-lock.json docs/release-notes/vX.Y.Z.md
-   git commit -m "chore(release): vX.Y.Z"
+   git commit -m "release: vX.Y.Z"
    git tag -a vX.Y.Z -m "vX.Y.Z"
    git push origin main
    git push origin vX.Y.Z
@@ -45,10 +55,19 @@ assets manually from a local checkout except as an emergency repair.
 - `CI` runs on `main` and pull requests: `npm ci`, `npm test`, and
   `npm run release:preflight`.
 - `Release` runs on `v*.*.*` tags. It verifies tag/package/release-note
-  alignment, reruns tests and preflight, builds the tarball, and creates the
-  GitHub Release with both assets.
+  alignment and the bilingual release-note requirement, reruns tests and
+  preflight, builds the tarball, and creates the GitHub Release with both
+  assets.
 - Release title is the tag by default. Human-friendly positioning belongs in
   the release note body.
+- Commit messages must match `<type>(<scope>): <summary>` or `release:
+  vX.Y.Z`. The `.gitmessage` file is installed as the local git commit
+  template by `npm install`, and `.husky/commit-msg` enforces the format.
+- Prefer signed release commits and tags so GitHub shows `Verified`
+  provenance. Use `git commit -S` and `git tag -s` when your GitHub account has
+  a registered GPG/SSH signing key. This is recommended, not hook-enforced,
+  until every release-capable maintainer and automation path has signing
+  configured.
 
 ## Emergency repair
 

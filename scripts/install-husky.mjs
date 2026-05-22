@@ -24,6 +24,7 @@ if (process.env.CI || process.env.NETOPS_SKIP_HUSKY) {
 try {
   const husky = await import("husky");
   husky.default();
+  execSync("git config commit.template .gitmessage", { cwd: repoRoot, stdio: "ignore" });
 } catch (e) {
   if (e?.code === "ERR_MODULE_NOT_FOUND") process.exit(0);
   console.error(`husky setup skipped: ${e.message}`);

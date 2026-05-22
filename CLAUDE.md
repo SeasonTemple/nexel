@@ -45,6 +45,7 @@ nexel/
 | `npm run lint:skills` | Lint SKILL.md frontmatter (use `--dir=<path>` and `--id-prefix=<prefix>` to target a product) |
 | `npm run lint:manifest` | Validate `install.json` against the schema |
 | `npm run lint:drift` | Detect drift between manifest and disk |
+| `npm run lint:commit-msg -- .git/COMMIT_EDITMSG` | Validate commit message format |
 | `npm run lint:release-sync` | Check `package.json` version == newest `docs/release-notes/v*.md` (semver; also runs in pre-commit) |
 | `node scripts/verify-release-tag.mjs vX.Y.Z` | Check tag/package/release-note alignment before pushing a release tag |
 
@@ -111,7 +112,16 @@ Downstream products can fork the linter (`scripts/lint-skills.mjs`) if they want
 
 - ESM (`type: module`); use `.mjs` for new scripts
 - No CHANGELOG.md — release context lives in `docs/release-notes/<tag>.md` and tag annotations
+- Commit messages use the fixed template `<type>(<scope>): <summary>` with
+  types `feat|fix|docs|test|refactor|perf|build|ci|chore|release`; the
+  `commit-msg` hook enforces this. Use `.gitmessage` as the local template.
+- Prefer signed release commits and tags so GitHub shows `Verified`
+  provenance. Do not make signing a hard local hook requirement until the
+  maintainer machines and automation path all have signing keys configured.
 - Release automation lives in GitHub Actions. For normal releases, follow `docs/release-workflow.md`: update version + release note, push `main`, then push the `vX.Y.Z` tag. Do not manually create GitHub Release assets unless repairing a failed release.
+- Release notes must provide both `## English` and `## 中文` sections. The
+  release preflight and tag validation scripts enforce this for the current
+  package version.
 - Plugin versioning is manual — there is no automatic semver tool
 - Don't add ts/tsx; this is a pure JS kernel
 - New tests run via `node --test`; no Jest / Vitest dependency
