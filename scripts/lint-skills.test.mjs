@@ -96,6 +96,34 @@ test("validateSkill: extra fields like trigger pass", () => {
   assert.equal(findings.length, 0);
 });
 
+test("validateSkill: opencode-instructions accepts plain relative path on any category", () => {
+  const findings = validateSkill(
+    "foo",
+    validFm("foo", { category: "review" }) + "\nopencode-instructions: references/opencode-instructions.md"
+  );
+  assert.equal(findings.length, 0);
+});
+
+test("validateSkill: opencode-instructions rejects invalid syntax", () => {
+  const cases = [
+    ["empty", "opencode-instructions:"],
+    ["non-string", "opencode-instructions:\n  - references/opencode-instructions.md"],
+    ["quoted", "opencode-instructions: \"references/opencode-instructions.md\""],
+    ["space", "opencode-instructions: references/open code.md"],
+    ["absolute", `opencode-instructions: ${path.join(os.tmpdir(), "x.md")}`],
+    ["windows-drive-absolute", "opencode-instructions: C:\\tmp\\x.md"],
+    ["windows-unc-absolute", "opencode-instructions: \\\\server\\share\\x.md"],
+    ["escape", "opencode-instructions: ../outside.md"],
+  ];
+  for (const [label, line] of cases) {
+    const findings = validateSkill("foo", `${validFm("foo")}\n${line}`);
+    assert.ok(
+      findings.some((f) => /opencode-instructions/.test(f.message)),
+      `${label} should fail: ${JSON.stringify(findings)}`
+    );
+  }
+});
+
 test("validateSkill: missing frontmatter (null)", () => {
   const findings = validateSkill("foo", null);
   assert.equal(findings.length, 1);

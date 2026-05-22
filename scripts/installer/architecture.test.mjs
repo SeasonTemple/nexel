@@ -184,6 +184,25 @@ test("architecture: examples/sample-product/bin.mjs only imports the public API 
   );
 });
 
+test("architecture: sample OpenCode plugin imports only the public plugin subpath", () => {
+  const file = path.resolve(SCRIPTS_ROOT, "..", "examples", "sample-product", ".opencode", "plugins", "sample-product.js");
+  if (!fs.existsSync(file)) return;
+  const imports = extractImports(file);
+  const violations = [];
+
+  for (const spec of imports) {
+    if (spec.startsWith("node:")) continue;
+    if (spec === "nexel/adapters/opencode-plugin") continue;
+    violations.push(`examples/sample-product/.opencode/plugins/sample-product.js → ${spec} (must use nexel/adapters/opencode-plugin, not installer internals)`);
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `sample OpenCode plugin imports private paths:\n  ${violations.join("\n  ")}`
+  );
+});
+
 test("architecture: installer/index.mjs re-exports stable public API symbols", () => {
   const file = path.join(INSTALLER_ROOT, "index.mjs");
   const src = fs.readFileSync(file, "utf8");

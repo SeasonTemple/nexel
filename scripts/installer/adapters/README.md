@@ -43,6 +43,27 @@ All IO must happen inside one of the exported functions, scoped to the `{ overri
 
 `architecture.test.mjs` and `adapters/spi.test.mjs` enforce this rule via load-order sensitivity tests.
 
+## OpenCode direct install vs plugin runtime
+
+OpenCode has two separate seams:
+
+- **Direct install** uses the Adapter SPI in this document. The OpenCode
+  adapter maps skills to `skills/`, agents to `agent/` with frontmatter
+  translation, and rule reference files to their declared paths. Its
+  `transformAssetContent` hook remains pure and direct-install only: no env
+  reads, no filesystem discovery, and no mutation of OpenCode runtime config.
+- **Plugin Runtime** runs inside an OpenCode plugin after product files are
+  present. Products import the public subpath
+  `nexel/adapters/opencode-plugin` and call `configureOpenCode(config,
+  skillsDir)`. That helper adds `skillsDir` to `config.skills.paths` and
+  appends skill-declared `opencode-instructions` files to
+  `config.instructions`.
+
+`opencode-instructions` is **Skill Metadata** in `SKILL.md` frontmatter. It is
+not a Manifest field, not an Asset, and not part of Adapter SPI v1.1.
+Instruction files stay inside their declaring skill directory and are consumed
+only by OpenCode plugin runtime. The Kernel core does not know OpenCode.
+
 ## Minimal adapter template
 
 ```js

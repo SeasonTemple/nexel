@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
+import { isValidOpenCodeInstructionsPath, readOpenCodeInstructions } from "./installer/core/skill-metadata.mjs";
+
 const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---/;
 const CATEGORIES = new Set(["principle", "best-practice", "test", "review", "tool", "setup"]);
 export const VALID_CATEGORIES = Object.freeze([...CATEGORIES]);
@@ -67,7 +69,24 @@ export function validateSkill(dirname, frontmatterText, options = {}) {
   } else if (!CATEGORIES.has(cat)) {
     findings.push({ severity: "error", message: `category mismatch: "${cat}" not in {${VALID_CATEGORIES.join(", ")}}` });
   }
+  validateOpenCodeInstructions(parsed, frontmatterText, findings);
   return findings;
+}
+
+function validateOpenCodeInstructions(parsed, frontmatterText, findings) {
+  if (!Object.hasOwn(parsed, "opencode-instructions")) return;
+  const value = parsed["opencode-instructions"];
+  if (typeof value !== "string") {
+    findings.push({ severity: "error", message: `opencode-instructions must be a string, got ${typeof value}` });
+    return;
+  }
+  const rawValue = readOpenCodeInstructions(frontmatterText);
+  if (!isValidOpenCodeInstructionsPath(rawValue)) {
+    findings.push({
+      severity: "error",
+      message: "opencode-instructions must be a non-empty unquoted relative path without whitespace, absolute paths, or .. segments",
+    });
+  }
 }
 
 export function lintSkillsDir(skillsDir, options = {}) {

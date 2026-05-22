@@ -43,10 +43,15 @@ test("install: fresh install writes file + state, returns ok shape", async () =>
   try {
     const r = await install(base({ target, selectionIds: ["sample:hello-world"] }));
     assert.equal(r.ok, true);
-    assert.equal(r.writtenCount, 1);
+    assert.equal(r.writtenCount, 2);
     const st = readState(target);
-    assert.equal(st.managedFiles.length, 1);
-    assert.ok(fs.existsSync(path.join(target, st.managedFiles[0].relPath)), "skill on disk");
+    assert.equal(st.managedFiles.length, 2);
+    const rels = st.managedFiles.map((file) => file.relPath).sort();
+    assert.deepEqual(rels, [
+      "skills/hello-world/SKILL.md",
+      "skills/hello-world/references/opencode-instructions.md",
+    ]);
+    for (const rel of rels) assert.ok(fs.existsSync(path.join(target, rel)), `${rel} on disk`);
   } finally { fs.rmSync(target, { recursive: true, force: true }); }
 });
 

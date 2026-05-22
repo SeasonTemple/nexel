@@ -116,7 +116,24 @@ expecting usage text.
   The bin name, skill prefix, manifest filename, and which assets exist are
   product-supplied and vary per product.
 
-## 6. Worked example
+## 6. OpenCode runtime seam
+
+OpenCode direct install and OpenCode plugin runtime are separate seams:
+
+- Direct install uses the OpenCode Adapter and writes files under the target
+  config root. It installs skills, translated agents, and rule reference files;
+  it does not write `AGENTS.md` and does not mutate OpenCode runtime config.
+- Plugin runtime is executed by a product's OpenCode plugin. Products that
+  want plugin-mode discovery can import
+  `nexel/adapters/opencode-plugin` and call `configureOpenCode(config,
+  skillsDir)`. This adds `skillsDir` to `config.skills.paths` and appends any
+  declared `opencode-instructions` files to `config.instructions`.
+
+`opencode-instructions` lives in `SKILL.md` frontmatter as Skill Metadata. It
+does not make the target file a standalone Asset, and it is not a Manifest
+field.
+
+## 7. Worked example
 
 `examples/sample-product/bin.mjs` is a complete, runnable instantiation —
 a real `ProductConfig` wrapping `createCli`. Use it to see every contract

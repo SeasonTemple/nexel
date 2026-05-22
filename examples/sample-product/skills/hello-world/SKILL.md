@@ -2,6 +2,7 @@
 name: sample:hello-world
 category: best-practice
 description: Minimal hello-world skill demonstrating the SKILL.md frontmatter contract used by agent-skills-installer.
+opencode-instructions: references/opencode-instructions.md
 ---
 
 # Hello World
@@ -23,3 +24,5 @@ Every `SKILL.md` must have YAML frontmatter with three required fields:
 - `description`: non-empty one-line string
 
 Other fields (`tools`, `model`, `origin`, …) are passed through unchanged.
+`opencode-instructions` is skill metadata for OpenCode plugin runtime; it is
+not a separately installable asset.

@@ -17,6 +17,7 @@ import {
   FRONTMATTER_RE,
 } from "./schema.mjs";
 import { loadManifest, defaultPaths, stripBom } from "./loader.mjs";
+import { isValidOpenCodeInstructionsPath, readOpenCodeInstructions } from "../skill-metadata.mjs";
 
 function isInsideRepo(repoRoot, candidate) {
   if (typeof candidate !== "string" || candidate.length === 0) return false;
@@ -200,6 +201,23 @@ function validateSkillFrontmatterMatch(skill, skillMdPath, findings) {
   if (catMatch && catMatch[1].trim() !== skill.category) {
     pushError(findings, "skills", skill.id, `frontmatter category "${catMatch[1].trim()}" does not match manifest category "${skill.category}"`);
   }
+  validateOpenCodeInstructionsFile(skill, skillMdPath, fm, findings);
+}
+
+function validateOpenCodeInstructionsFile(skill, skillMdPath, frontmatterText, findings) {
+  const relativeInstructionPath = readOpenCodeInstructions(frontmatterText);
+  if (relativeInstructionPath === null) return;
+  if (!isValidOpenCodeInstructionsPath(relativeInstructionPath)) return;
+
+  const skillDir = path.dirname(skillMdPath);
+  const instructionPath = path.resolve(skillDir, relativeInstructionPath);
+  if (!instructionPath.startsWith(`${skillDir}${path.sep}`)) {
+    pushError(findings, "skills", skill.id, `opencode-instructions path escapes skill directory: ${relativeInstructionPath}`);
+    return;
+  }
+  if (!fs.existsSync(instructionPath)) {
+    pushError(findings, "skills", skill.id, `opencode-instructions file does not exist: ${path.posix.join(skill.sourcePath, relativeInstructionPath)}`);
+  }
 }
 
 function validateDependencies(deps, agents, rules, skills, section, ownerId, findings) {
@@ -292,8 +310,13 @@ export function formatFindings(findings, mode = "text") {
 function main() {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
-  const repoRoot = path.resolve(process.cwd());
+  const manifestFlag = args.find((arg) => arg.startsWith("--manifest="));
+  const manifestPath = manifestFlag
+    ? path.resolve(manifestFlag.slice("--manifest=".length))
+    : null;
+  const repoRoot = manifestPath ? path.dirname(manifestPath) : path.resolve(process.cwd());
   const paths = defaultPaths(repoRoot);
+  if (manifestPath) paths.manifestPath = manifestPath;
   if (!fs.existsSync(paths.manifestPath)) {
     process.stderr.write(`manifest not found: ${paths.manifestPath}\n`);
     process.exit(2);

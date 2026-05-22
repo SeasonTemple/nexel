@@ -18,6 +18,10 @@ _Avoid_: settings, options
 A pluggable per-CLI integration (Claude Code, Codex, OpenCode) implementing the SPI. Decides where assets land and — at SPI v1.1 — how their content is transformed.
 _Avoid_: plugin, driver, backend
 
+**Plugin Runtime**:
+An agent-CLI plugin hook that mutates the host CLI runtime config after product files are available; distinct from an **Adapter**, which maps/transforms install-time **Asset**s.
+_Avoid_: Adapter, installer plugin, runtime adapter
+
 **Asset**:
 A unit the kernel installs. Exactly one of: **skill**, **agent**, **rule**. Not a generic file.
 _Avoid_: artifact, resource, file
@@ -25,6 +29,10 @@ _Avoid_: artifact, resource, file
 **Manifest**:
 `install.json` — the single source of truth for what assets/bundles exist. An asset is visible to the kernel iff it has a manifest entry.
 _Avoid_: config, registry
+
+**Skill Metadata**:
+Frontmatter on a skill's `SKILL.md` that describes host-specific activation or validation hints without making new **Asset**s visible.
+_Avoid_: Manifest field, asset declaration
 
 **Absorption**:
 Pulling a *kernel-level* (product-agnostic) evolution back from the more-evolved downstream fork (netops-agent-skills) into this OSS kernel. Product-specific downstream content is explicitly never absorbed.
@@ -48,6 +56,8 @@ _Avoid_: the release process (overloaded with the lint)
 
 - A **Kernel** is configured by exactly one **ProductConfig** per consuming product
 - An **Adapter** maps and transforms **Asset**s; a **Manifest** declares which **Asset**s exist
+- **Skill Metadata** annotates a skill that is already visible through the **Manifest**
+- A **Plugin Runtime** configures the host CLI after files are available; it is not part of the **Adapter** SPI
 - A **Public API contract** begins only at the first **Published baseline**; until then there is none
 - The **Release model** is git-tag/vendor, so `lint-release-sync` enforces version↔release-note (registry-agnostic), not npm state
 
@@ -61,3 +71,4 @@ _Avoid_: the release process (overloaded with the lint)
 - **"skillctl" the npm package vs this kernel's former name** — resolved: distinct and unrelated. `npm view skillctl` returns a third-party package ("Gestor de Skills para Agentes de IA", 0.0.3–0.0.9, frozen 2026-02). This repo's kernel is unpublished and is now named `nexel` (ADR-0007 resolved the formerly-provisional name; the npm `skillctl` was never this project). Do not treat the npm registry state as this project's history.
 - **"release process"** was used for both the `lint-release-sync` mechanical check and the distribution model — resolved: the mechanical check is the *release-sync lint*; the distribution/versioning posture is the **Release model**.
 - **"three-platform capability parity"** — unqualified claim is false. An **Agent**'s `tools:` restriction cannot survive the OpenCode transform (OpenCode's validator rejects Claude's frontmatter shape). Resolved: a Claude/Codex-restricted agent runs at OpenCode's default subagent access — a *named, accepted divergence* (ADR-0002 D4), revisitable if OpenCode gains a native restriction field. The kernel claims parity of *capability surface*, not of *per-agent tool restriction on OpenCode*.
+- **"`opencode-instructions` vs setup routing"** — resolved: `opencode-instructions` is **Skill Metadata** for OpenCode **Plugin Runtime** ambient instruction loading and is category/profile agnostic. It is not a setup router contract; downstream setup routing belongs to separate product metadata such as `setup-config-target`.
