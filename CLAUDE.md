@@ -46,6 +46,7 @@ nexel/
 | `npm run lint:manifest` | Validate `install.json` against the schema |
 | `npm run lint:drift` | Detect drift between manifest and disk |
 | `npm run lint:release-sync` | Check `package.json` version == newest `docs/release-notes/v*.md` (semver; also runs in pre-commit) |
+| `node scripts/verify-release-tag.mjs vX.Y.Z` | Check tag/package/release-note alignment before pushing a release tag |
 
 ## Architecture invariants (enforced by `architecture.test.mjs`)
 
@@ -110,6 +111,7 @@ Downstream products can fork the linter (`scripts/lint-skills.mjs`) if they want
 
 - ESM (`type: module`); use `.mjs` for new scripts
 - No CHANGELOG.md — release context lives in `docs/release-notes/<tag>.md` and tag annotations
+- Release automation lives in GitHub Actions. For normal releases, follow `docs/release-workflow.md`: update version + release note, push `main`, then push the `vX.Y.Z` tag. Do not manually create GitHub Release assets unless repairing a failed release.
 - Plugin versioning is manual — there is no automatic semver tool
 - Don't add ts/tsx; this is a pure JS kernel
 - New tests run via `node --test`; no Jest / Vitest dependency

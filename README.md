@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-288%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-292%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Getting started](#getting-started) · [Core model](#core-model) · [Reference](#reference) · [Agent contract](#agent-cli-contract) · [Examples](./examples/sample-product/)
 
