@@ -35,6 +35,7 @@
   },
   "files": [
     "scripts/installer/**/*.mjs",
+    "scripts/install-skills.mjs",
     "scripts/lint-skills.mjs",
     "scripts/install-husky.mjs",
     "examples/sample-product/**",
@@ -46,6 +47,7 @@
     "docs/release-notes/**"
   ],
   "scripts": {
+    "demo:install": "node scripts/install-skills.mjs",
     "lint:skills": "node scripts/lint-skills.mjs --dir=examples/sample-product/skills --id-prefix=sample",
     "lint:manifest": "node scripts/installer/core/manifest/validator.mjs --manifest=examples/sample-product/sample.install.json",
     "lint:drift": "node scripts/installer/core/manifest/drift.mjs --manifest=examples/sample-product/sample.install.json",
@@ -74,7 +76,8 @@
     "test:opencode-plugin": "node --test scripts/installer/adapters/opencode-plugin.test.mjs",
     "test:architecture": "node --test scripts/installer/architecture.test.mjs",
     "test:sample-bin": "node --test examples/sample-product/sample-bin.test.mjs",
-    "test": "node --test scripts/lint-skills.test.mjs scripts/lint-release-sync.test.mjs scripts/release-preflight.test.mjs scripts/verify-baseline.test.mjs scripts/installer/core/manifest/loader.test.mjs scripts/installer/core/manifest/validator.test.mjs scripts/installer/core/manifest/drift.test.mjs scripts/installer/core/errors.test.mjs scripts/installer/core/asset-types.test.mjs scripts/installer/core/which.test.mjs scripts/installer/core/plan.test.mjs scripts/installer/core/stage-asset.test.mjs scripts/installer/cli/commands/repair-rehash.test.mjs scripts/installer/cli/commands/index.test.mjs scripts/installer/cli/argv.test.mjs scripts/installer/cli/dispatch.test.mjs scripts/installer/cli/help.test.mjs scripts/installer/cli/strings.test.mjs scripts/installer/cli/locale-isolation.test.mjs scripts/installer/cli/prompts.test.mjs scripts/installer/cli/error-format.test.mjs scripts/installer/adapters/spi.test.mjs scripts/installer/adapters/opencode.test.mjs scripts/installer/adapters/opencode-plugin.test.mjs scripts/installer/architecture.test.mjs scripts/installer/conformance.test.mjs examples/sample-product/sample-bin.test.mjs examples/sample-product/sample-opencode-plugin.test.mjs",
+    "test:install-demo": "node --test scripts/install-skills.test.mjs",
+    "test": "node --test scripts/lint-skills.test.mjs scripts/lint-release-sync.test.mjs scripts/release-preflight.test.mjs scripts/verify-baseline.test.mjs scripts/install-skills.test.mjs scripts/installer/core/manifest/loader.test.mjs scripts/installer/core/manifest/validator.test.mjs scripts/installer/core/manifest/drift.test.mjs scripts/installer/core/errors.test.mjs scripts/installer/core/asset-types.test.mjs scripts/installer/core/which.test.mjs scripts/installer/core/plan.test.mjs scripts/installer/core/stage-asset.test.mjs scripts/installer/cli/commands/repair-rehash.test.mjs scripts/installer/cli/commands/index.test.mjs scripts/installer/cli/argv.test.mjs scripts/installer/cli/dispatch.test.mjs scripts/installer/cli/help.test.mjs scripts/installer/cli/strings.test.mjs scripts/installer/cli/locale-isolation.test.mjs scripts/installer/cli/prompts.test.mjs scripts/installer/cli/error-format.test.mjs scripts/installer/adapters/spi.test.mjs scripts/installer/adapters/opencode.test.mjs scripts/installer/adapters/opencode-plugin.test.mjs scripts/installer/architecture.test.mjs scripts/installer/conformance.test.mjs examples/sample-product/sample-bin.test.mjs examples/sample-product/sample-opencode-plugin.test.mjs",
     "setup:hooks": "husky",
     "prepare": "node scripts/install-husky.mjs",
     "release:patch": "npm version patch -m \"chore(release): %s\"",

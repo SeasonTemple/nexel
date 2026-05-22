@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-285%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-288%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [Why](#why-nexel) · [Getting started](#getting-started) · [Core model](#core-model) · [Reference](#reference) · [Agent contract](#agent-cli-contract) · [Examples](./examples/sample-product/)
 
@@ -98,6 +98,25 @@ examples/sample-product/
 ├── bin.mjs                    # Wraps createCli with the config above
 └── sample-bin.test.mjs        # End-to-end spawnSync tests
 ```
+
+To see the full visual install flow without touching a real agent home, run:
+
+```sh
+node scripts/install-skills.mjs
+# or
+npm run demo:install
+```
+
+The demo uses `examples/sample-product`, previews the install plan, then writes
+skills / agents / rules plus `.nexel/state.json` into a temporary target
+directory. It does not write to `~/.codex`, `~/.claude`, or OpenCode config
+directories by default. For automated verification:
+
+```sh
+node scripts/install-skills.mjs --demo --yes --json --cleanup
+```
+
+The same sample product can also be driven directly as a normal product bin:
 
 ```sh
 node examples/sample-product/bin.mjs help

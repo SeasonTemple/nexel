@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
-[![Tests](https://img.shields.io/badge/tests-285%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-288%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
 [English](./README.md) · [中文](./README.zh-CN.md) · [为什么](#为什么用-nexel) · [快速开始](#快速开始) · [核心模型](#核心模型) · [参考](#参考) · [Agent 契约](#ai-agent-cli-契约) · [示例](./examples/sample-product/)
 
@@ -94,6 +94,24 @@ examples/sample-product/
 ├── bin.mjs                    # 以上述 config 包装 createCli
 └── sample-bin.test.mjs        # spawnSync 端到端测试
 ```
+
+要查看完整的可视化安装流程,且不触碰真实 agent home,运行:
+
+```sh
+node scripts/install-skills.mjs
+# 或
+npm run demo:install
+```
+
+该 demo 复用 `examples/sample-product`,会先展示安装流程与 install plan,再把
+skills / agents / rules 以及 `.nexel/state.json` 写入临时 target 目录。默认
+不会写入 `~/.codex`、`~/.claude` 或 OpenCode 配置目录。自动化验证可用:
+
+```sh
+node scripts/install-skills.mjs --demo --yes --json --cleanup
+```
+
+同一个 sample product 也可以作为普通产品 bin 直接驱动:
 
 ```sh
 node examples/sample-product/bin.mjs help
