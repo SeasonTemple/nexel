@@ -16,6 +16,74 @@ function semverGt(a, b) {
   return false;
 }
 
+// Extract the minimum acceptable version from a single semver range disjunct.
+// Handles the common shapes that appear in npm `engines.node` fields:
+//   "^X.Y.Z" / "~X.Y.Z" / ">=X.Y.Z" / ">X.Y.Z" / "X.Y.Z" / "*" / ""
+// Returns the X.Y.Z string of the floor, or null when the disjunct is open
+// (`*`, empty, or unparseable). Open ranges are treated as "no constraint"
+// by callers (they neither raise the host floor nor narrow a dep's floor).
+function disjunctFloor(disjunct) {
+  const trimmed = disjunct.trim();
+  if (!trimmed || trimmed === "*" || trimmed === "x" || trimmed === "latest") return null;
+  // strip leading operators
+  const m = /^(?:\^|~|>=|>|=)?\s*(\d+(?:\.\d+){0,2})/.exec(trimmed);
+  if (!m) return null;
+  const parts = m[1].split(".").map(Number);
+  while (parts.length < 3) parts.push(0);
+  // `>X.Y.Z` is approximated as next patch — close enough for floor comparison
+  if (trimmed.startsWith(">") && !trimmed.startsWith(">=")) parts[2] += 1;
+  return parts.join(".");
+}
+
+// Lowest acceptable version across a multi-disjunct semver range. For
+// `^22.22.2 || ^24.15.0 || >=26.0.0` returns "22.22.2".
+// Returns null when every disjunct is open (range = "*"), meaning "no floor".
+export function rangeMinimum(range) {
+  if (typeof range !== "string") return null;
+  const disjuncts = range.split("||");
+  const floors = [];
+  for (const d of disjuncts) {
+    const f = disjunctFloor(d);
+    if (f === null) return null; // any open disjunct opens the whole range
+    floors.push(f);
+  }
+  if (floors.length === 0) return null;
+  return floors.reduce((min, v) => (semverGt(min, v) ? v : min), floors[0]);
+}
+
+// Compare a runtime dependency's engines.node floor to the host's. The host
+// promises to install on every Node version `>=` its declared floor; the dep
+// must accept every such version, so the dep's lowest acceptable version
+// must be `<=` the host's. Returns null on compatible, or a structured
+// detail object on incompatible.
+function checkDepEngines(name, depRange, hostMin) {
+  if (!depRange) return null;
+  const depMin = rangeMinimum(depRange);
+  if (depMin === null) return null; // dep has open range — accepts anything host accepts
+  if (hostMin === null) {
+    // Host declared `*` or omitted engines — strict view: any dep with a floor wins
+    return { name, depRange, depMin, hostRange: "*", hostMin: null };
+  }
+  if (semverGt(depMin, hostMin)) {
+    return { name, depRange, depMin, hostMin };
+  }
+  return null;
+}
+
+function checkRuntimeDepsEngines(pkg, lock) {
+  const hostRange = pkg.engines?.node;
+  const hostMin = rangeMinimum(hostRange);
+  const deps = pkg.dependencies || {};
+  const conflicts = [];
+  for (const name of Object.keys(deps)) {
+    const lockEntry = lock.packages?.[`node_modules/${name}`];
+    const depRange = lockEntry?.engines?.node;
+    const conflict = checkDepEngines(name, depRange, hostMin);
+    if (conflict) conflicts.push(conflict);
+  }
+  return { hostRange: hostRange || "(none)", hostMin, conflicts };
+}
+
 function newestReleaseNoteVersion(dir) {
   const versions = fs.readdirSync(dir)
     .map((name) => /^v(\d+\.\d+\.\d+)\.md$/.exec(name))
@@ -58,6 +126,29 @@ export function runPreflight({ repoRoot = REPO_ROOT, allowDirty = false } = {}) 
     bilingual.ok ? "English and Chinese sections present" : bilingual.failures.join("; "));
   add("newest-release-note-matches-package", newest === version,
     `package=${version} newest=${newest ?? "(none)"}`);
+
+  // Runtime dependency engines.node floor vs host engines.node floor.
+  // Catches the "we bumped a dep that quietly requires newer Node" trap —
+  // a missing host engines bump leaves npm install silently succeeding on
+  // older runtimes that the dep refuses to load at runtime.
+  const engines = checkRuntimeDepsEngines(pkg, lock);
+  if (engines.hostMin === null) {
+    add(
+      "runtime-deps-engines-compatible",
+      engines.conflicts.length === 0,
+      engines.conflicts.length === 0
+        ? "host engines.node not declared — no constraint surface"
+        : `host engines.node not declared (treat as strictest); deps: ${engines.conflicts.map((c) => `${c.name}@${c.depRange}`).join(", ")}`,
+    );
+  } else {
+    add(
+      "runtime-deps-engines-compatible",
+      engines.conflicts.length === 0,
+      engines.conflicts.length === 0
+        ? `host=${engines.hostRange} satisfies every runtime dep's engines.node floor`
+        : `host=${engines.hostRange} (min ${engines.hostMin}) too low for: ${engines.conflicts.map((c) => `${c.name} engines.node=${c.depRange} (min ${c.depMin})`).join("; ")}`,
+    );
+  }
 
   const mismatches = checks.filter((check) => !check.ok);
   return { ok: mismatches.length === 0, version, checks, mismatches };
