@@ -9,6 +9,10 @@
 //   - targetPathLayout
 //   - envProfile / envBannerTitle
 //   - envLocale
+//   - repositoryUrl / pluginName / marketplaceName / pluginAuthor /
+//     pluginDescription  (v0.7 — plugin metadata, used by scaffolder +
+//     pluginInstallInstructions adapter renderers; pluginName and
+//     marketplaceName derive from productName when omitted)
 //
 // `defineProductConfig({...})` is the canonical constructor. It:
 //   - Rejects missing required fields with ERR_INVALID_PRODUCT_CONFIG, listing
@@ -59,6 +63,15 @@ const OPTIONAL_DEFAULTS = Object.freeze({
   envProfile: undefined,
   envBannerTitle: undefined,
   envLocale: undefined,
+  // v0.7 plugin-metadata fields. All optional; consumers (scaffolder,
+  // pluginInstallInstructions) fail-loud at the call site when a required
+  // field is missing — keeps the construction contract backward-compatible
+  // for products that never publish a plugin form.
+  repositoryUrl: undefined,
+  pluginName: undefined,        // derived = productName when omitted
+  marketplaceName: undefined,   // derived = `${productName}-marketplace` when omitted
+  pluginAuthor: undefined,
+  pluginDescription: undefined,
 });
 
 /**
@@ -122,6 +135,12 @@ export function defineProductConfig(overrides) {
   }
 
   // Required identity passes. Fill optional fields.
+  //
+  // IMPORTANT: this Object.freeze enumerates every supported field by name —
+  // overrides are NOT spread. Adding a new field to OPTIONAL_DEFAULTS without
+  // adding it here causes the field to be silently dropped from the returned
+  // config (silent-drop bug class). The product-config.test.mjs canary test
+  // guards this contract.
   return Object.freeze({
     productName: overrides.productName,
     skillIdPrefix: overrides.skillIdPrefix,
@@ -138,6 +157,17 @@ export function defineProductConfig(overrides) {
     envProfile: overrides.envProfile ?? OPTIONAL_DEFAULTS.envProfile,
     envBannerTitle: overrides.envBannerTitle ?? OPTIONAL_DEFAULTS.envBannerTitle,
     envLocale: overrides.envLocale ?? OPTIONAL_DEFAULTS.envLocale,
+    // v0.7 plugin metadata. `repositoryUrl` is dual-purpose: git source
+    // (OpenCode adapter `git clone`) AND marketplace URL (Claude / Codex
+    // adapter `marketplace add`) — see ADR-0010. `pluginName` and
+    // `marketplaceName` derive from `productName` when omitted, so a
+    // pure-installer downstream that never publishes a plugin keeps a
+    // zero-burden upgrade path.
+    repositoryUrl: overrides.repositoryUrl ?? OPTIONAL_DEFAULTS.repositoryUrl,
+    pluginName: overrides.pluginName ?? overrides.productName,
+    marketplaceName: overrides.marketplaceName ?? `${overrides.productName}-marketplace`,
+    pluginAuthor: overrides.pluginAuthor ?? OPTIONAL_DEFAULTS.pluginAuthor,
+    pluginDescription: overrides.pluginDescription ?? OPTIONAL_DEFAULTS.pluginDescription,
   });
 }
 

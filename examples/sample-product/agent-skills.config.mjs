@@ -28,4 +28,11 @@ export default defineProductConfig({
   envTelemetry: "SAMPLE_TELEMETRY",
   envBannerTitle: "SAMPLE_BANNER_TITLE",
   telemetryDirName: ".sample-installer",
+
+  // v0.7 plugin metadata — consumed by scaffolder + pluginInstallInstructions
+  // adapter renderers. repositoryUrl is dual-purpose (git source + marketplace
+  // URL, see ADR-0010); pluginName / marketplaceName derive from productName
+  // when omitted.
+  repositoryUrl: "https://github.com/SeasonTemple/nexel",
+  pluginDescription: "Sample worked-example plugin demonstrating nexel's downstream layout.",
 });
