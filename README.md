@@ -7,7 +7,7 @@
 **A product-agnostic kernel for installing one agent-skill pack across any agent CLI, through a pluggable adapter SPI. Claude Code, Codex, and OpenCode ship built-in.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522.22.2-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
 [![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
@@ -72,7 +72,7 @@ npm install "git+https://github.com/<owner>/nexel.git#v0.6.0"
 git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.6.0
 ```
 
-Requires Node ≥ 18, ESM only. Per-tag release notes live in
+Requires Node ≥ 22.22.2 (bumped in v0.7.0 to satisfy runtime-dep `engines.node` floors — see `docs/release-notes/v0.7.0.md`). ESM only. Per-tag release notes live in
 [`docs/release-notes/`](./docs/release-notes/).
 
 Local release artifacts can be produced without publishing to npm:

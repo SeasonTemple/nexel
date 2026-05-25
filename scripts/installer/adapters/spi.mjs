@@ -232,7 +232,24 @@ export function createAdapterRegistry(adapters) {
         );
         e.code = ERR_DIRECT_UNSUPPORTED;
         e.adapterId = adapterId;
-        e.pluginInstallInstructions = a.pluginInstallInstructions(productConfig);
+        // Render plugin install instructions defensively so a throwing
+        // third-party adapter does not mask the underlying
+        // ERR_DIRECT_UNSUPPORTED contract.
+        try {
+          e.pluginInstallInstructions = a.pluginInstallInstructions(productConfig);
+        } catch (rendererError) {
+          e.pluginInstallInstructions = "";
+          e.pluginInstallInstructionsError = `adapter pluginInstallInstructions threw: ${rendererError.message}`;
+        }
+        // SPI v1.2 lazy-validate path: when productConfig is absent or
+        // lacks repositoryUrl, the adapter returns an actionable error
+        // string instead of real install instructions. Surface that as a
+        // separate boolean+message so JSON envelope consumers can tell
+        // "real instructions" apart from "config error rendered as text".
+        if (!productConfig?.repositoryUrl) {
+          e.pluginInstallInstructionsError = e.pluginInstallInstructionsError
+            ?? "productConfig.repositoryUrl missing — pluginInstallInstructions content is a diagnostic, not real install steps";
+        }
         throw e;
       }
       return a;

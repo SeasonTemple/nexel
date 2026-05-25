@@ -54,9 +54,9 @@ export function pluginInstallInstructions(productConfig) {
       "Add `repositoryUrl: \"https://...\"` to your agent-skills.config.mjs to enable plugin instructions.",
     ].join("\n");
   }
-  const productName = productConfig.productName;
-  const pluginName = productConfig.pluginName ?? productName;
-  const marketplaceName = productConfig.marketplaceName ?? `${productName}-marketplace`;
+  // defineProductConfig eager-normalizes pluginName + marketplaceName from
+  // productName, so they are always strings on a valid ProductConfig.
+  const { productName, pluginName, marketplaceName } = productConfig;
   return [
     `Claude Code plugin install for ${productName} (recommended for full bundle):`,
     `  1. Run: claude plugin marketplace add ${productConfig.repositoryUrl}`,

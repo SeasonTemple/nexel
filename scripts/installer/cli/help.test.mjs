@@ -8,6 +8,9 @@ import { printHelp, renderHelp, hasVerbHelp } from "./help.mjs";
 const PRODUCTION_VERBS = [
   "install", "uninstall", "update", "list", "plan", "agents",
   "doctor", "repair", "export", "import", "validate",
+  // v0.7: scaffold is opt-in (enablePluginScaffolder flag) but ships with
+  // a per-verb help renderer so opt-in callers get --help coverage.
+  "scaffold",
 ];
 
 // Sentinel that appears only in the composed full body (flagsBlock), never

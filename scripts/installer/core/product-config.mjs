@@ -45,6 +45,11 @@ import {
  * @property {string|undefined} envProfile
  * @property {string|undefined} envBannerTitle
  * @property {string|undefined} envLocale
+ * @property {string|undefined} repositoryUrl     v0.7 — git source + marketplace URL (ADR-0010 dual-purpose)
+ * @property {string}           pluginName        v0.7 — always set; derived = productName when omitted
+ * @property {string}           marketplaceName   v0.7 — always set; derived = `${productName}-marketplace` when omitted
+ * @property {string|undefined} pluginAuthor      v0.7 — optional plugin metadata
+ * @property {string|undefined} pluginDescription v0.7 — optional plugin metadata
  */
 
 const REQUIRED_FIELDS = Object.freeze([
@@ -132,6 +137,32 @@ export function defineProductConfig(overrides) {
       ERR_INVALID_PRODUCT_CONFIG,
       { field: "agentNamePrefix" }
     );
+  }
+
+  // productName must be a safe filesystem segment + JS identifier base —
+  // it is embedded in generated plugin manifest paths (.opencode/plugins/
+  // <productName>.js), in generated JS identifiers, and in shell-quoted
+  // command strings rendered by adapter pluginInstallInstructions. Path
+  // separators, `..`, and shell-special chars would escape the intended
+  // sandbox or inject into the rendered output.
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(overrides.productName)) {
+    throw new ProductConfigError(
+      `productName must match /^[a-zA-Z][a-zA-Z0-9_-]*$/ (got "${overrides.productName}") — embedded in generated plugin filenames and identifiers`,
+      ERR_INVALID_PRODUCT_CONFIG,
+      { field: "productName" }
+    );
+  }
+  // Same constraint on pluginName / marketplaceName when explicitly provided
+  // (derived defaults inherit productName's already-validated charset).
+  for (const field of ["pluginName", "marketplaceName"]) {
+    const v = overrides[field];
+    if (v !== undefined && v !== null && !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(v)) {
+      throw new ProductConfigError(
+        `${field} must match /^[a-zA-Z][a-zA-Z0-9_-]*$/ (got "${v}")`,
+        ERR_INVALID_PRODUCT_CONFIG,
+        { field }
+      );
+    }
   }
 
   // Required identity passes. Fill optional fields.

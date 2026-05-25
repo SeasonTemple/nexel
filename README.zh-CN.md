@@ -7,7 +7,7 @@
 **产品无关内核 —— 一套 agent-skill pack 写一次,经可插拔 adapter SPI 适配到任意 agent CLI;Claude Code、Codex、OpenCode 内置。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A518-43853d?logo=node.js&logoColor=white)](./package.json)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522.22.2-43853d?logo=node.js&logoColor=white)](./package.json)
 [![Type: ESM](https://img.shields.io/badge/type-ESM-f7df1e?logo=javascript&logoColor=black)](./package.json)
 [![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)](./scripts/installer/architecture.test.mjs)
 
@@ -68,7 +68,7 @@ npm install "git+https://github.com/<owner>/nexel.git#v0.6.0"
 git clone https://github.com/<owner>/nexel.git && cd nexel && git checkout v0.6.0
 ```
 
-依赖 Node ≥ 18,仅 ESM。每个 tag 的发布说明见
+依赖 Node ≥ 22.22.2（v0.7.0 提升以满足 runtime-dep `engines.node` 下限 — 详见 `docs/release-notes/v0.7.0.md`），仅 ESM。每个 tag 的发布说明见
 [`docs/release-notes/`](./docs/release-notes/)。
 
 本地 release artifacts 可在不发布 npm 的情况下生成:

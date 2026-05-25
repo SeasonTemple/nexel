@@ -53,11 +53,9 @@ test("SPI_DEFAULTS exposes all eight optional fields with sensible defaults", ()
   }
   assert.deepEqual([...SPI_DEFAULTS.supportedAssetTypes], ["skill", "agent", "rule"]);
   assert.equal(typeof SPI_DEFAULTS.pluginInstallInstructions, "function");
-  // SPI v1.2: pluginInstallInstructions now accepts productConfig. The identity
-  // default returns "" for any input. Function.length === 1 is the visible
-  // signature signal of the v1.2 contract (NOT a stability promise — see
-  // spi.mjs SPI evolution policy).
-  assert.equal(SPI_DEFAULTS.pluginInstallInstructions.length, 1, "v1.2 arity = 1");
+  // SPI v1.2: identity default returns "" for any input. Function.length is
+  // documented as NOT part of the contract (see spi.mjs evolution policy);
+  // assert only the observable behavior, never the arity.
   assert.equal(SPI_DEFAULTS.pluginInstallInstructions(), "", "callable with no args (backward-compat path)");
   assert.equal(SPI_DEFAULTS.pluginInstallInstructions({ productName: "demo" }), "", "callable with productConfig");
   assert.equal(SPI_DEFAULTS.supportsDirect, false);

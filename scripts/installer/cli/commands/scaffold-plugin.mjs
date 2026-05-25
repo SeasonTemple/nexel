@@ -45,12 +45,11 @@ function repositoryUrlOrThrow(productConfig) {
   return productConfig.repositoryUrl;
 }
 
-function pluginNameOf(pc) {
-  return pc.pluginName ?? pc.productName;
-}
-function marketplaceNameOf(pc) {
-  return pc.marketplaceName ?? `${pc.productName}-marketplace`;
-}
+// defineProductConfig eager-normalizes pluginName + marketplaceName, so a
+// valid ProductConfig always carries both. These accessors stay narrow so
+// adapter callers can pass the ProductConfig directly without re-deriving.
+function pluginNameOf(pc) { return pc.pluginName; }
+function marketplaceNameOf(pc) { return pc.marketplaceName; }
 
 function renderClaudePluginJson(pc, version) {
   return {
@@ -181,9 +180,10 @@ function auditNexelDep(targetDir) {
     const inDeps = !!(pkg.dependencies && NEXEL_DEP_NAME in pkg.dependencies);
     const inPeer = !!(pkg.peerDependencies && NEXEL_DEP_NAME in pkg.peerDependencies);
     if (inDeps || inPeer) return null;
+    const relPkg = path.relative(targetDir, pkgPath) || "package.json";
     return (
       `Generated OpenCode plugin entry imports "nexel/adapters/opencode-plugin"; ` +
-      `add "${NEXEL_DEP_NAME}" to ${pkgPath} dependencies (or peerDependencies) before running ` +
+      `add "${NEXEL_DEP_NAME}" to ${relPkg} dependencies (or peerDependencies) before running ` +
       `\`opencode plugin <dir>\`.`
     );
   } catch {
@@ -216,6 +216,35 @@ export function scaffoldPlugin(productConfig, opts = {}) {
     throw new CommandError("scaffoldPlugin: repoRoot or targetDir is required", ERR_ARGS, {});
   }
   const targetDir = targetDirOpt ? path.resolve(targetDirOpt) : path.resolve(repoRoot);
+
+  // Sandbox guard — refuse to scaffold into a directory that doesn't look
+  // like a product root or a prior scaffold output. Acceptance:
+  //   (a) targetDir is missing or empty
+  //   (b) targetDir contains a package.json (looks like a product root)
+  //   (c) targetDir already contains a scaffolder-owned subdirectory
+  //       (.claude-plugin / .codex-plugin / .agents / .opencode) — i.e.,
+  //       we have written here before; second-run/force is legitimate.
+  // This blocks accidental `--target=$HOME` style invocations from
+  // scattering manifest files into an unrelated tree.
+  if (fs.existsSync(targetDir)) {
+    const entries = fs.readdirSync(targetDir);
+    const isEmpty = entries.length === 0;
+    const hasPackageJson = entries.includes("package.json");
+    const hasPriorScaffold =
+      entries.includes(".claude-plugin") ||
+      entries.includes(".codex-plugin") ||
+      entries.includes(".agents") ||
+      entries.includes(".opencode");
+    if (!isEmpty && !hasPackageJson && !hasPriorScaffold) {
+      throw new CommandError(
+        `scaffold: refusing to write into ${targetDir} — directory is non-empty, lacks package.json, and shows no prior scaffold output. ` +
+          `Point --target at a product root (must contain package.json), an empty directory, or a directory you previously scaffolded.`,
+        ERR_ARGS,
+        { targetDir },
+      );
+    }
+  }
+
   const version = versionOpt ?? readVersionForScaffold(repoRoot, targetDir);
 
   const pluginName = pluginNameOf(productConfig);
@@ -255,9 +284,20 @@ export function scaffoldPlugin(productConfig, opts = {}) {
       skipped.push(f.rel);
       continue;
     }
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, f.content);
-    written.push(f.rel);
+    try {
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, f.content);
+      written.push(f.rel);
+    } catch (e) {
+      // Surface as CommandError with details so the caller (dispatchScaffold
+      // / external orchestrator) can render an actionable JSON envelope.
+      // Carry the partial-state lists so the caller can clean up if needed.
+      throw new CommandError(
+        `scaffold: failed to write ${f.rel} into ${targetDir}: ${e.code || ""} ${e.message}`,
+        ERR_ARGS,
+        { targetDir, failedAt: f.rel, written, skipped, cause: e.code || null },
+      );
+    }
   }
 
   const warnings = [];

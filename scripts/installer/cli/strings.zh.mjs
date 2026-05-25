@@ -38,6 +38,8 @@ export const strings = Object.freeze({
   export                     将已安装选择集以 JSON 输出到 stdout
   import                     从 stdin 读取选择集 JSON 并安装(配合 export)
   validate <path/SKILL.md>   lint 单个 SKILL.md frontmatter,不扫描整个 repo
+  scaffold                   按 ProductConfig 生成三平台 plugin 布局
+                             (仅当 createCli({enablePluginScaffolder: true}))
   help                       显示此信息`,
 
     flagsBlock: ({ adapterList, envProfile, envBannerTitle, binName }) => `通用 flags:
@@ -255,6 +257,28 @@ Reads the envelope on stdin (pipe 'export'). Files re-install from the
 destination's repo manifest, not a frozen snapshot.
 
 Run '${binName} help' for the complete reference.
+`,
+      scaffold: ({ binName }) => `${binName} scaffold — 按 ProductConfig 生成三平台 plugin 布局
+
+用法:
+  ${binName} scaffold [--target <path>] [--force] [--no-deps] [--json]
+
+Flags:
+  --target <path>       写入的目录(默认: cwd)
+  --force               覆盖已存在文件(默认: 跳过)
+  --no-deps             跳过下游 package.json runtime-dep 审计
+  --json                机器可读 {written, skipped, warnings} envelope
+
+生成六个文件: .claude-plugin/{plugin,marketplace}.json、
+.codex-plugin/plugin.json、.agents/plugins/marketplace.json、
+.opencode/INSTALL.md、.opencode/plugins/<pluginName>.js。
+要求 productConfig.repositoryUrl,缺则 fail-loud。
+
+如果 target 目录非空且无 package.json,拒绝写入 —— 防止 --target=$HOME 等误用。
+
+仅当 createCli({enablePluginScaffolder: true}) 时可用。
+
+运行 '${binName} help' 查看完整参考。
 `,
       validate: ({ binName }) => `${binName} validate — lint a single SKILL.md frontmatter
 

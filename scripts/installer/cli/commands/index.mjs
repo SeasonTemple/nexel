@@ -80,14 +80,22 @@ export function assertValidExistingState(state) {
   }
 }
 
-export function assertStateSelectionsKnown(state, manifest) {
-  const unknownSelections = [];
+// Pure helper — returns the list of selectionIds in state.installations
+// that the current manifest no longer knows. Non-throwing so callers
+// (doctor diagnostics) can fold the result into multi-check reports.
+export function staleSelectionIds(state, manifest) {
+  const unknown = [];
   for (const inst of state.installations) {
     const sid = inst.selectionId;
     if (!manifest.skills[sid] && !manifest.bundles[sid]) {
-      unknownSelections.push(sid);
+      unknown.push(sid);
     }
   }
+  return unknown;
+}
+
+export function assertStateSelectionsKnown(state, manifest) {
+  const unknownSelections = staleSelectionIds(state, manifest);
   if (unknownSelections.length > 0) {
     throw new CommandError(
       `state.json references selection(s) absent from current manifest: ${unknownSelections.join(", ")}. ` +
@@ -925,9 +933,7 @@ export function doctorCommand({ repoRoot, adapterId, target, productConfig, env 
       // gracefully so doctor still reports on adapters with missing/bad manifest.
       try {
         const m = loadValidatedManifest(repoRoot, productConfig);
-        const unknown = state.installations
-          .map((inst) => inst.selectionId)
-          .filter((sid) => !m.skills[sid] && !m.bundles[sid]);
+        const unknown = staleSelectionIds(state, m);
         if (unknown.length > 0) {
           add("state-selections-known", false,
             `${unknown.length} state selectionId(s) absent from manifest: ${unknown.join(", ")}; clean reinstall or remove retired entries`);

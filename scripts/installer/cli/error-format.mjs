@@ -31,7 +31,15 @@ export function handleError(e, args, { stdout = process.stdout, stderr = process
   }
   if (e?.code === "ERR_DIRECT_UNSUPPORTED") {
     if (args.json) {
-      stdout.write(JSON.stringify({ ok: false, error: e.code, message: e.message, details: { pluginInstallInstructions: e.pluginInstallInstructions } }) + "\n");
+      const details = { pluginInstallInstructions: e.pluginInstallInstructions };
+      // SPI v1.2 — non-null pluginInstallInstructionsError signals the
+      // instructions field is a diagnostic message, not real install steps.
+      // JSON consumers must check this before parsing the instructions
+      // string as a command sequence.
+      if (e.pluginInstallInstructionsError) {
+        details.pluginInstallInstructionsError = e.pluginInstallInstructionsError;
+      }
+      stdout.write(JSON.stringify({ ok: false, error: e.code, message: e.message, details }) + "\n");
     } else {
       stderr.write(strings.errors.pluginInstructions({ message: e.message, instructions: e.pluginInstallInstructions }) + "\n");
     }

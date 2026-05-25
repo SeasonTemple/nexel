@@ -28,27 +28,59 @@ function disjunctFloor(disjunct) {
   // strip leading operators
   const m = /^(?:\^|~|>=|>|=)?\s*(\d+(?:\.\d+){0,2})/.exec(trimmed);
   if (!m) return null;
+  const specifiedSegments = m[1].split(".").length;
   const parts = m[1].split(".").map(Number);
   while (parts.length < 3) parts.push(0);
-  // `>X.Y.Z` is approximated as next patch — close enough for floor comparison
-  if (trimmed.startsWith(">") && !trimmed.startsWith(">=")) parts[2] += 1;
+  // `>X.Y.Z` is approximated by bumping the lowest-specified segment (so `>22`
+  // becomes 23.0.0, `>22.22` becomes 22.23.0, `>22.22.2` becomes 22.22.3).
+  // Bumping the patch slot for two-segment ranges understated the true minimum.
+  if (trimmed.startsWith(">") && !trimmed.startsWith(">=")) {
+    parts[specifiedSegments - 1] += 1;
+    for (let i = specifiedSegments; i < parts.length; i++) parts[i] = 0;
+  }
   return parts.join(".");
 }
 
 // Lowest acceptable version across a multi-disjunct semver range. For
 // `^22.22.2 || ^24.15.0 || >=26.0.0` returns "22.22.2".
 // Returns null when every disjunct is open (range = "*"), meaning "no floor".
+//
+// Mixed ranges like `^18 || *` are intentionally treated as "no constraint"
+// here because the open disjunct legitimately admits all versions. Callers
+// that want to flag mixed ranges as suspicious should use rangeAudit().
 export function rangeMinimum(range) {
-  if (typeof range !== "string") return null;
+  const audit = rangeAudit(range);
+  return audit.floor;
+}
+
+// Returns a richer view of a semver range so callers can distinguish
+// "genuinely unconstrained" from "mixed open + concrete disjuncts". The
+// latter often signals a dep author who added `|| *` accidentally and
+// would benefit from surfacing the concrete floors despite the open clause.
+export function rangeAudit(range) {
+  if (typeof range !== "string") {
+    return { floor: null, hasOpenDisjunct: false, concreteFloors: [] };
+  }
   const disjuncts = range.split("||");
-  const floors = [];
+  const concreteFloors = [];
+  let hasOpenDisjunct = false;
   for (const d of disjuncts) {
     const f = disjunctFloor(d);
-    if (f === null) return null; // any open disjunct opens the whole range
-    floors.push(f);
+    if (f === null) {
+      hasOpenDisjunct = true;
+      continue;
+    }
+    concreteFloors.push(f);
   }
-  if (floors.length === 0) return null;
-  return floors.reduce((min, v) => (semverGt(min, v) ? v : min), floors[0]);
+  if (concreteFloors.length === 0) {
+    return { floor: null, hasOpenDisjunct, concreteFloors };
+  }
+  if (hasOpenDisjunct) {
+    // Mixed: the open clause admits everything; floor is null (compatible).
+    return { floor: null, hasOpenDisjunct, concreteFloors };
+  }
+  const min = concreteFloors.reduce((acc, v) => (semverGt(acc, v) ? v : acc), concreteFloors[0]);
+  return { floor: min, hasOpenDisjunct: false, concreteFloors };
 }
 
 // Compare a runtime dependency's engines.node floor to the host's. The host
@@ -75,13 +107,22 @@ function checkRuntimeDepsEngines(pkg, lock) {
   const hostMin = rangeMinimum(hostRange);
   const deps = pkg.dependencies || {};
   const conflicts = [];
+  const mixedOpenRanges = [];
   for (const name of Object.keys(deps)) {
     const lockEntry = lock.packages?.[`node_modules/${name}`];
     const depRange = lockEntry?.engines?.node;
     const conflict = checkDepEngines(name, depRange, hostMin);
     if (conflict) conflicts.push(conflict);
+    // Audit mixed-open ranges (e.g., `^18 || *`) so users see when a
+    // concrete floor is being silently suppressed by an accidental wildcard.
+    if (depRange) {
+      const audit = rangeAudit(depRange);
+      if (audit.hasOpenDisjunct && audit.concreteFloors.length > 0) {
+        mixedOpenRanges.push({ name, depRange, concreteFloors: audit.concreteFloors });
+      }
+    }
   }
-  return { hostRange: hostRange || "(none)", hostMin, conflicts };
+  return { hostRange: hostRange || "(none)", hostMin, conflicts, mixedOpenRanges };
 }
 
 function newestReleaseNoteVersion(dir) {
@@ -132,21 +173,24 @@ export function runPreflight({ repoRoot = REPO_ROOT, allowDirty = false } = {}) 
   // a missing host engines bump leaves npm install silently succeeding on
   // older runtimes that the dep refuses to load at runtime.
   const engines = checkRuntimeDepsEngines(pkg, lock);
+  const mixedNote = engines.mixedOpenRanges.length > 0
+    ? `; mixed-open ranges (concrete floor suppressed by '*' clause): ${engines.mixedOpenRanges.map((m) => `${m.name}@${m.depRange}`).join(", ")}`
+    : "";
   if (engines.hostMin === null) {
     add(
       "runtime-deps-engines-compatible",
       engines.conflicts.length === 0,
       engines.conflicts.length === 0
-        ? "host engines.node not declared — no constraint surface"
-        : `host engines.node not declared (treat as strictest); deps: ${engines.conflicts.map((c) => `${c.name}@${c.depRange}`).join(", ")}`,
+        ? `host engines.node not declared — no constraint surface${mixedNote}`
+        : `host engines.node not declared (treat as strictest); deps: ${engines.conflicts.map((c) => `${c.name}@${c.depRange}`).join(", ")}${mixedNote}`,
     );
   } else {
     add(
       "runtime-deps-engines-compatible",
       engines.conflicts.length === 0,
       engines.conflicts.length === 0
-        ? `host=${engines.hostRange} satisfies every runtime dep's engines.node floor`
-        : `host=${engines.hostRange} (min ${engines.hostMin}) too low for: ${engines.conflicts.map((c) => `${c.name} engines.node=${c.depRange} (min ${c.depMin})`).join("; ")}`,
+        ? `host=${engines.hostRange} satisfies every runtime dep's engines.node floor${mixedNote}`
+        : `host=${engines.hostRange} (min ${engines.hostMin}) too low for: ${engines.conflicts.map((c) => `${c.name} engines.node=${c.depRange} (min ${c.depMin})`).join("; ")}${mixedNote}`,
     );
   }
 

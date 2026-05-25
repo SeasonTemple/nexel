@@ -120,10 +120,14 @@ test("defineProductConfig: pluginAuthor / pluginDescription default to undefined
 test("silent-drop canary: every OPTIONAL_DEFAULTS field round-trips through defineProductConfig", () => {
   const overrides = minimalRequired();
   const sentinels = {};
+  // Fields with charset validation accept only /^[a-zA-Z][a-zA-Z0-9_-]*$/
+  // (pluginName / marketplaceName). Use sentinels that match that pattern.
+  const validatedIdentifierFields = new Set(["pluginName", "marketplaceName"]);
   for (const field of Object.keys(OPTIONAL_DEFAULTS)) {
-    // pick a sentinel shape that the validator will accept regardless of type
     if (field === "targetPathLayout") {
-      sentinels[field] = { skills: "_canary_skills", agents: "_canary_agents" };
+      sentinels[field] = { skills: "canarySkills", agents: "canaryAgents" };
+    } else if (validatedIdentifierFields.has(field)) {
+      sentinels[field] = `canary-${field}`;
     } else {
       sentinels[field] = `_canary_${field}_`;
     }

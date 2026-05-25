@@ -69,9 +69,12 @@ export function createCli({
   const adapterIds = adapters.map((a) => a.id);
   // v0.7: scaffold verb is opt-in. When the caller passes
   // enablePluginScaffolder: true, fold it into the effective extraHandlers
-  // map so pure-installer downstreams never see the verb in --help.
+  // map so pure-installer downstreams never see the verb in --help. The
+  // kernel-provided scaffold appears FIRST so a caller-supplied
+  // extraHandlers.scaffold shadows it — explicit user override wins over
+  // the convenience default.
   const effectiveExtras = enablePluginScaffolder
-    ? { ...extraHandlers, scaffold: dispatchScaffold }
+    ? { scaffold: dispatchScaffold, ...extraHandlers }
     : extraHandlers;
   const verbs = validVerbs ?? (effectiveExtras
     ? new Set([...DEFAULT_VERBS, ...Object.keys(effectiveExtras)])

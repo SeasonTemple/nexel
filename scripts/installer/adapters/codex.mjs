@@ -50,9 +50,8 @@ export function pluginInstallInstructions(productConfig) {
       "Add `repositoryUrl: \"https://...\"` to your agent-skills.config.mjs to enable plugin instructions.",
     ].join("\n");
   }
-  const productName = productConfig.productName;
-  const pluginName = productConfig.pluginName ?? productName;
-  const marketplaceName = productConfig.marketplaceName ?? `${productName}-marketplace`;
+  // defineProductConfig eager-normalizes pluginName + marketplaceName.
+  const { productName, pluginName, marketplaceName } = productConfig;
   return [
     `Codex plugin install for ${productName} (recommended for full bundle):`,
     `  1. Run: codex plugin marketplace add ${productConfig.repositoryUrl}`,

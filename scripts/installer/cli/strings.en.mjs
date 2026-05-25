@@ -38,6 +38,8 @@ export const strings = Object.freeze({
   export                     Dump installed selection set as JSON to stdout (portable across machines)
   import                     Read selection-set JSON from stdin and install (pair with export)
   validate <path/SKILL.md>   Lint a single SKILL.md frontmatter without scanning the whole repo
+  scaffold                   Generate three-platform plugin layout from ProductConfig
+                             (only when createCli({enablePluginScaffolder: true}))
   help                       Show this message`,
 
     flagsBlock: ({ adapterList, envProfile, envBannerTitle, binName }) => `Common flags:
@@ -253,6 +255,29 @@ Flags:
 
 Reads the envelope on stdin (pipe 'export'). Files re-install from the
 destination's repo manifest, not a frozen snapshot.
+
+Run '${binName} help' for the complete reference.
+`,
+      scaffold: ({ binName }) => `${binName} scaffold — generate three-platform plugin layout from ProductConfig
+
+Usage:
+  ${binName} scaffold [--target <path>] [--force] [--no-deps] [--json]
+
+Flags:
+  --target <path>       directory to write the plugin layout into (default: cwd)
+  --force               overwrite existing files (default: skip)
+  --no-deps             skip the downstream package.json runtime-dep audit
+  --json                machine-readable {written, skipped, warnings} envelope
+
+Generates six files: .claude-plugin/{plugin,marketplace}.json,
+.codex-plugin/plugin.json, .agents/plugins/marketplace.json,
+.opencode/INSTALL.md, and .opencode/plugins/<pluginName>.js. Requires
+productConfig.repositoryUrl (fail-loud at scaffold time when missing).
+
+Refuses to write into a non-empty directory without a package.json so an
+accidental --target=$HOME does not scatter manifests across an unrelated tree.
+
+Only available when createCli was invoked with enablePluginScaffolder: true.
 
 Run '${binName} help' for the complete reference.
 `,

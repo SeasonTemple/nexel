@@ -32,7 +32,6 @@
 // pinpoints every drifted manifest.
 
 import fs from "node:fs";
-import path from "node:path";
 
 function readVersionFromSpec({ path: filePath, pluginName }) {
   if (!fs.existsSync(filePath)) {
@@ -88,8 +87,13 @@ export function verifyMarketplaceLockstep(specs) {
   for (const r of resolved) {
     const expected = r.spec.expectedVersion ?? baseline;
     if (r.version !== expected) {
+      // Path is returned verbatim from the spec — callers control the format
+      // they passed in. Earlier path.relative(process.cwd(), ...) coupling
+      // could escape cwd (../ prefix) and depended on stable cwd between
+      // call site and report consumption, neither of which is reliable for
+      // library callers.
       mismatches.push({
-        path: path.relative(process.cwd(), r.spec.path),
+        path: r.spec.path,
         pluginName: r.spec.pluginName,
         found: r.version,
         expected,
