@@ -63,6 +63,9 @@ export { detectDrift } from "./core/manifest/drift.mjs";
 // ---------- v0.7: marketplace lockstep helper ----------
 export { verifyMarketplaceLockstep } from "./core/marketplace-lockstep.mjs";
 
+// ---------- v0.7: scaffold-plugin (opt-in via createCli({enablePluginScaffolder: true})) ----------
+export { scaffoldPlugin, dispatchScaffold } from "./cli/commands/scaffold-plugin.mjs";
+
 // ---------- CLI command entry points (re-exported for advanced consumers; Unit 7 introduces createCli) ----------
 export {
   install,

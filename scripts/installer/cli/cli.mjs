@@ -25,6 +25,7 @@ import { handleError } from "./error-format.mjs";
 import { dispatchVerb, KERNEL_HANDLERS } from "./dispatch.mjs";
 import { CancelledError } from "./prompts.mjs";
 import { applyLocale } from "./locale.mjs";
+import { dispatchScaffold } from "./commands/scaffold-plugin.mjs";
 
 const DEFAULT_VERBS = new Set([
   ...Object.keys(KERNEL_HANDLERS),
@@ -52,6 +53,7 @@ export function createCli({
   events,
   extraHandlers,
   validVerbs,
+  enablePluginScaffolder = false,
 } = {}) {
   if (!adapters) {
     throw new Error("createCli: adapters[] is required");
@@ -65,8 +67,14 @@ export function createCli({
   }
   const adapterRegistry = createAdapterRegistry(adapters);
   const adapterIds = adapters.map((a) => a.id);
-  const verbs = validVerbs ?? (extraHandlers
-    ? new Set([...DEFAULT_VERBS, ...Object.keys(extraHandlers)])
+  // v0.7: scaffold verb is opt-in. When the caller passes
+  // enablePluginScaffolder: true, fold it into the effective extraHandlers
+  // map so pure-installer downstreams never see the verb in --help.
+  const effectiveExtras = enablePluginScaffolder
+    ? { ...extraHandlers, scaffold: dispatchScaffold }
+    : extraHandlers;
+  const verbs = validVerbs ?? (effectiveExtras
+    ? new Set([...DEFAULT_VERBS, ...Object.keys(effectiveExtras)])
     : DEFAULT_VERBS);
   const repoRoot = process.cwd();
   const ctx = Object.freeze({
@@ -95,7 +103,7 @@ export function createCli({
         process.env[productConfig.envProfile] = args.profile;
       }
       try {
-        const handled = await dispatchVerb({ verb: args.verb, args, ctx, extraHandlers });
+        const handled = await dispatchVerb({ verb: args.verb, args, ctx, extraHandlers: effectiveExtras });
         if (handled) return;
         // Unknown verb: fall back to help, exit 0.
         printHelp({ productConfig, version: ctx.version, adapters: adapterIds });

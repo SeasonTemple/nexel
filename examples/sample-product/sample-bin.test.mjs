@@ -203,6 +203,60 @@ test("run: unknown verb falls through to full help, exit 0", () => {
   assert.ok(r.stdout.includes("Common flags:"), "unknown verb renders the full body");
 });
 
+// --- U7: scaffold verb (opt-in via createCli({enablePluginScaffolder: true})) ---
+
+test("sample bin scaffold: clean target writes 6 files, exit 0", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "scaf-bin-clean-"));
+  try {
+    const r = runBin(["scaffold", "--target", target]);
+    assert.equal(r.code, 0, `expected exit 0, got ${r.code}: ${r.stderr}`);
+    assert.match(r.stdout, /wrote\s+6 file/);
+    for (const rel of [
+      ".claude-plugin/plugin.json",
+      ".claude-plugin/marketplace.json",
+      ".codex-plugin/plugin.json",
+      ".agents/plugins/marketplace.json",
+      ".opencode/INSTALL.md",
+      ".opencode/plugins/sample-product.js",
+    ]) {
+      assert.ok(fs.existsSync(path.join(target, rel)), `scaffolder must create ${rel}`);
+    }
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("sample bin scaffold: re-run on populated target skips every file, exit 0", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "scaf-bin-skip-"));
+  try {
+    runBin(["scaffold", "--target", target]);
+    const r = runBin(["scaffold", "--target", target]);
+    assert.equal(r.code, 0);
+    assert.match(r.stdout, /wrote\s+0 file/);
+    assert.match(r.stdout, /skipped\s+6 file/);
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("sample bin scaffold: --force overwrites every file, exit 0", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "scaf-bin-force-"));
+  try {
+    runBin(["scaffold", "--target", target]);
+    const r = runBin(["scaffold", "--target", target, "--force"]);
+    assert.equal(r.code, 0);
+    assert.match(r.stdout, /wrote\s+6 file/);
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("sample bin scaffold: --json envelope is a single parseable line", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "scaf-bin-json-"));
+  try {
+    const r = runBin(["scaffold", "--target", target, "--json"]);
+    assert.equal(r.code, 0);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.written.length, 6);
+    assert.equal(parsed.skipped.length, 0);
+    assert.ok(Array.isArray(parsed.warnings));
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
 // NOT covered by construction (documented, not asserted — plan 003 U3):
 //   * CancelledError → exit 130: thrown only inside prompts.mjs, which the
 //     kernel/sample bin never invoke non-interactively. No spawn vector

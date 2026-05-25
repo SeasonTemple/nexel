@@ -38,6 +38,11 @@ const cli = createCli({
   adapters: [claude, codex, opencode],
   productConfig,
   version: PKG.version,
+  // Sample-product demonstrates the v0.7 opt-in scaffold verb. Real
+  // downstream products that already ship a plugin form can skip this
+  // flag — the scaffolder is for new products bootstrapping their
+  // plugin layout from a ProductConfig.
+  enablePluginScaffolder: true,
 });
 
 cli.run(process.argv).catch((e) => {

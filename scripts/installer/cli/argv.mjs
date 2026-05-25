@@ -50,6 +50,7 @@ export function parseArgs(argv, { validVerbs } = {}) {
     all: false,
     printPath: null,
     apply: false,
+    noDeps: false,
     profile: null,
     lang: null,
     positional: [],
@@ -64,6 +65,7 @@ export function parseArgs(argv, { validVerbs } = {}) {
     if (x === "--force") { out.force = true; continue; }
     if (x === "--all") { out.all = true; continue; }
     if (x === "--apply") { out.apply = true; continue; }
+    if (x === "--no-deps") { out.noDeps = true; continue; }
     if (x === "--profile") { out.profile = a[++i]; continue; }
     if (x.startsWith("--profile=")) { out.profile = x.slice(10); continue; }
     if (x === "--lang") { out.lang = a[++i]; continue; }
