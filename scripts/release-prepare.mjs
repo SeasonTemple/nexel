@@ -23,11 +23,89 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+// Release-note stub template (since v0.7.0). Bilingual, table-driven so the
+// rendered GitHub Release page uses the full content-column width instead of
+// being dominated by short bullets and white space.
+//
+// Required sections (release-note-policy.mjs enforces `## English` + `## 中文`):
+//   - Highlights — area / change / why-it-matters table; the elevator pitch
+//   - Compatibility — what/before/after/action table; the upgrade decision row
+//   - Added — what shipped this release; group by Implementation Unit when
+//     the release comes from a plan, by area otherwise
+//   - Notes — caveats, known issues, deferred items
+//
+// Drop a section when it is empty; never pad with TODO bullets in the
+// published note. Keep summaries terse — tables read better in the GitHub
+// Release page's content column than long paragraphs.
+
+const STUB_TEMPLATE = ({ version }) => `# v${version} — <one-line theme>
+
+> <YYYY-MM-DD> · <one-line scope: units / ADRs / breaking signals>
+
+## 中文
+
+### Highlights
+
+| 维度 | 改动 | 为什么重要 |
+|---|---|---|
+| **<Area>** | <change summary> | <why it matters in 1-2 sentences> |
+
+### Compatibility
+
+| What | Before | After | Action |
+|---|---|---|---|
+| <surface> | <prev> | <new> | <action> |
+
+### Added — by Implementation Unit
+
+| Unit | Surface | Tests |
+|---|---|---|
+| **U?** <name> | <what landed> | +N |
+
+合计：**X / X tests passing**。
+
+### Documentation
+
+- **ADR-####** — <decision>
+- **README** / **README.zh-CN** — <doc updates>
+
+### Notes
+
+- <caveat / known issue / deferred item>
+
+---
+
+## English
+
+### Highlights
+
+| Area | Change | Why it matters |
+|---|---|---|
+| **<Area>** | <change summary> | <why it matters in 1-2 sentences> |
+
+### Compatibility
+
+| What | Before | After | Action |
+|---|---|---|---|
+| <surface> | <prev> | <new> | <action> |
+
+### Added — by Implementation Unit
+
+| Unit | Surface | Tests |
+|---|---|---|
+| **U?** <name> | <what landed> | +N |
+
+Total: **X / X tests passing**.
+
+### Notes
+
+- <caveat / known issue / deferred item>
+`;
+
 function writeReleaseNoteStub(notePath, version) {
   if (fs.existsSync(notePath)) return false;
-  const text = `# v${version}\n\n## English\n\n- TODO: Summarize user-visible changes.\n- TODO: Note compatibility, migration, or operational details if any.\n\n## 中文\n\n- TODO: 总结用户可见的变化。\n- TODO: 如有兼容性、迁移或运维事项，在这里说明。\n`;
   fs.mkdirSync(path.dirname(notePath), { recursive: true });
-  fs.writeFileSync(notePath, text);
+  fs.writeFileSync(notePath, STUB_TEMPLATE({ version }));
   return true;
 }
 
