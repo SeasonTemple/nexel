@@ -52,6 +52,52 @@ export class CommandError extends Error {
   }
 }
 
+// State health helpers — applied at every command path that reads state.json
+// to convert structural problems and stale selection ids into actionable
+// CommandError messages rather than downstream stack traces.
+//
+// `assertValidExistingState`: structural check via state.mjs `validateState`.
+// Throws CommandError(ERR_STATE_INVALID) listing all findings in details.
+//
+// `assertStateSelectionsKnown`: cross-check `state.installations[].selectionId`
+// against the manifest's known skills + bundles. Accumulates every unknown
+// id (not short-circuit) so the operator sees the full cleanup list in one
+// pass. Throws CommandError(ERR_NOT_INSTALLED) — reuses the existing not-
+// installed error code to keep JSON envelope contracts stable.
+//
+// `import` is intentionally NOT bound to these checks because it seeds state
+// from an external envelope into an (often empty) target — pre-validating
+// would block legitimate first-import flows.
+
+export function assertValidExistingState(state) {
+  const findings = validateState(state);
+  if (findings.length > 0) {
+    throw new CommandError(
+      `existing state.json invalid: ${findings[0].path} — ${findings[0].message}`,
+      ERR_STATE_INVALID,
+      { findings }
+    );
+  }
+}
+
+export function assertStateSelectionsKnown(state, manifest) {
+  const unknownSelections = [];
+  for (const inst of state.installations) {
+    const sid = inst.selectionId;
+    if (!manifest.skills[sid] && !manifest.bundles[sid]) {
+      unknownSelections.push(sid);
+    }
+  }
+  if (unknownSelections.length > 0) {
+    throw new CommandError(
+      `state.json references selection(s) absent from current manifest: ${unknownSelections.join(", ")}. ` +
+        `Remove retired selections from state.json before this command, or run a clean reinstall.`,
+      ERR_NOT_INSTALLED,
+      { unknownSelections }
+    );
+  }
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -199,14 +245,8 @@ export async function install({
       targetRoot,
       now,
     });
-    const stateFindings = validateState(initialState);
-    if (stateFindings.length > 0) {
-      throw new CommandError(
-        `existing state.json invalid: ${stateFindings[0].path} — ${stateFindings[0].message}`,
-        ERR_STATE_INVALID,
-        { findings: stateFindings }
-      );
-    }
+    assertValidExistingState(initialState);
+    assertStateSelectionsKnown(initialState, manifest);
 
     if (!Array.isArray(selectionIds) || selectionIds.length === 0) {
       throw new CommandError("at least one --skill or --bundle required", ERR_NO_SELECTION);
@@ -529,6 +569,10 @@ export async function uninstall({
     if (!state) {
       throw new CommandError("no state.json at target; nothing to uninstall", ERR_NO_STATE);
     }
+    assertValidExistingState(state);
+    // Note: uninstall is a recovery path — does not bind assertStateSelectionsKnown.
+    // If state holds entries for selections retired from the manifest, the user
+    // should still be able to uninstall them; refusing would deadlock recovery.
     let postState = state;
     const allDeletes = [];
     // Accumulate blockers across all selections instead of stopping at the first.
@@ -632,6 +676,8 @@ export async function update({
   try {
     const state = readState(targetRoot);
     if (!state) throw new CommandError("no state.json at target; nothing to update", ERR_NO_STATE);
+    assertValidExistingState(state);
+    // Note: update is a recovery / refresh path — does not bind assertStateSelectionsKnown.
 
     const acceptSet = new Set(acceptModified);
     const candidates = [];
@@ -814,7 +860,7 @@ export function agentsCommand({ repoRoot, env = process.env } = {}) {
  *  - lock file age (stale lock detection)
  *  - per-managed-file existence + hash match (sampled — limit cost)
  */
-export function doctorCommand({ repoRoot, adapterId, target, env = process.env } = {}) {
+export function doctorCommand({ repoRoot, adapterId, target, productConfig, env = process.env } = {}) {
   const adapters = applyProfileToAdapters(listAdapterStatus({ env }), env);
   const filtered = (adapterId
     ? adapters.filter((a) => a.id === adapterId)
@@ -873,6 +919,27 @@ export function doctorCommand({ repoRoot, adapterId, target, env = process.env }
         add("state-schema", false, `${findings.length} schema issue(s); first: ${findings[0].path} — ${findings[0].message}`);
       } else {
         add("state-schema", true, "valid");
+      }
+
+      // Stale-selection diagnostic — try loading manifest; if unavailable, skip
+      // gracefully so doctor still reports on adapters with missing/bad manifest.
+      try {
+        const m = loadValidatedManifest(repoRoot, productConfig);
+        const unknown = state.installations
+          .map((inst) => inst.selectionId)
+          .filter((sid) => !m.skills[sid] && !m.bundles[sid]);
+        if (unknown.length > 0) {
+          add("state-selections-known", false,
+            `${unknown.length} state selectionId(s) absent from manifest: ${unknown.join(", ")}; clean reinstall or remove retired entries`);
+        } else {
+          add("state-selections-known", true, "all selections match manifest");
+        }
+      } catch (e) {
+        if (e.code === ERR_MANIFEST_MISSING || e.code === ERR_MANIFEST_INVALID) {
+          add("state-selections-known", true, "skipped (manifest unavailable)");
+        } else {
+          throw e;
+        }
       }
 
       const lockPath = path.join(stateDirFor(a.targetRoot), ".lock");
@@ -964,6 +1031,7 @@ export async function repair({
   // Read-only scan (no recoverySweep / no lock) when apply=false.
   if (!apply) {
     const state = readState(targetRoot);
+    assertValidExistingState(state);
     return scanForDrift(state, targetRoot, repoRoot);
   }
 
@@ -972,6 +1040,8 @@ export async function repair({
   const release = await acquireLock(targetRoot, { command: "repair", installerVersion });
   try {
     const state = readState(targetRoot);
+    assertValidExistingState(state);
+    // Note: repair is the canonical recovery path — does not bind assertStateSelectionsKnown.
     const drift = scanForDrift(state, targetRoot, repoRoot);
 
     const toRecopy = [];
@@ -1122,6 +1192,11 @@ export function exportCommand({ repoRoot, adapterId, target, productConfig, env 
   if (!state) {
     throw new CommandError("no state.json at target; nothing to export", ERR_NO_STATE);
   }
+  assertValidExistingState(state);
+  // Export emits selectionIds for re-application elsewhere — must not export
+  // selections that the target side will reject. Surface stale entries early.
+  const manifest = loadValidatedManifest(repoRoot, productConfig);
+  assertStateSelectionsKnown(state, manifest);
   return {
     schemaVersion: 1,
     agentId: adapter?.id || "custom",

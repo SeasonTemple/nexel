@@ -262,7 +262,7 @@ export async function runRepair(args, ctx) {
 }
 
 export async function runDoctor(args, ctx) {
-  const out = doctorCommand({ repoRoot: ctx.repoRoot, adapterId: args.adapter, target: args.target });
+  const out = doctorCommand({ repoRoot: ctx.repoRoot, adapterId: args.adapter, target: args.target, productConfig: ctx.productConfig });
   if (args.json) {
     process.stdout.write(JSON.stringify(out, null, 2) + "\n");
     process.exit(out.failCount > 0 ? 1 : 0);

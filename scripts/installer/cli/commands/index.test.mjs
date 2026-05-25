@@ -19,7 +19,9 @@ import {
   listCommand, agentsCommand, doctorCommand,
   exportCommand, importCommand, planSelection, planCommandText,
   getRepoCommit,
+  assertValidExistingState, assertStateSelectionsKnown,
 } from "./index.mjs";
+import { writeStateAtomic, stateDirFor } from "../../core/filesystem.mjs";
 import { loadManifest } from "../../core/manifest/loader.mjs";
 import { readState, STATE_DIRNAME } from "../../core/filesystem.mjs";
 
@@ -435,4 +437,178 @@ test("repair --apply: tampered file without --accept-modified is reported in ski
 test("STATE_DIRNAME is .nexel (locks the deliberate ADR-0008 rename)", () => {
   assert.equal(STATE_DIRNAME, ".nexel");
   assert.notEqual(STATE_DIRNAME, ".skillctl", "must not regress to the pre-rename name");
+});
+
+// --- U1: state health helpers (plan 2026-05-25-001) ---
+// assertValidExistingState / assertStateSelectionsKnown are bound at every
+// read-state command path that can act on a clean source-of-truth manifest.
+// Recovery paths (uninstall/update/repair) bind only the structural check so
+// stale selection entries do not deadlock cleanup.
+
+function writeRawState(target, payload) {
+  fs.mkdirSync(stateDirFor(target), { recursive: true });
+  fs.writeFileSync(path.join(stateDirFor(target), "state.json"), JSON.stringify(payload, null, 2));
+}
+
+// Inject a stale selection into a valid post-install state — both as
+// installations[] entry AND as managedFiles[].referencedBy so validateState
+// accepts it. Lets us test assertStateSelectionsKnown in isolation from
+// assertValidExistingState's orphaned-selection check.
+function injectStaleSelection(state, selectionId) {
+  state.installations.push({
+    selectionId,
+    selectionKind: "skill",
+    installMode: "direct",
+    installerVersion: "test",
+    installedAt: state.updatedAt,
+  });
+  if (state.managedFiles.length > 0) {
+    state.managedFiles[0].referencedBy.push(selectionId);
+  }
+  return state;
+}
+
+test("assertValidExistingState: passes on a valid state object", async () => {
+  const target = tmp("u1-helper-valid-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const state = readState(target);
+    assert.doesNotThrow(() => assertValidExistingState(state));
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("assertValidExistingState: throws CommandError(ERR_STATE_INVALID) with findings on bad shape", () => {
+  let err;
+  try { assertValidExistingState({ schemaVersion: 99, managedFiles: "nope" }); } catch (e) { err = e; }
+  assert.ok(err, "did not throw");
+  assert.equal(err.name, "CommandError");
+  assert.equal(err.code, "ERR_STATE_INVALID");
+  assert.ok(Array.isArray(err.details.findings), "details.findings must be an array");
+  assert.ok(err.details.findings.length >= 1, "must accumulate at least one finding");
+  assert.match(err.message, /existing state\.json invalid/);
+});
+
+test("assertStateSelectionsKnown: passes when every selectionId is in manifest", () => {
+  const state = {
+    installations: [{ selectionId: "sample:hello-world", selectionKind: "skill", installMode: "direct", installerVersion: "test", installedAt: "now" }],
+  };
+  assert.doesNotThrow(() => assertStateSelectionsKnown(state, manifest));
+});
+
+test("assertStateSelectionsKnown: accumulates every unknown selectionId in one error", () => {
+  const state = {
+    installations: [
+      { selectionId: "sample:hello-world", selectionKind: "skill", installMode: "direct", installerVersion: "test", installedAt: "now" },
+      { selectionId: "sample:retired-a", selectionKind: "skill", installMode: "direct", installerVersion: "test", installedAt: "now" },
+      { selectionId: "sample:retired-b", selectionKind: "bundle", installMode: "direct", installerVersion: "test", installedAt: "now" },
+    ],
+  };
+  let err;
+  try { assertStateSelectionsKnown(state, manifest); } catch (e) { err = e; }
+  assert.ok(err, "did not throw");
+  assert.equal(err.code, "ERR_NOT_INSTALLED");
+  assert.deepEqual(err.details.unknownSelections, ["sample:retired-a", "sample:retired-b"]);
+  assert.match(err.message, /retired-a, sample:retired-b/);
+  assert.match(err.message, /clean reinstall/);
+});
+
+test("install: stale state.json (unknown selectionId) blocks install with ERR_NOT_INSTALLED", async () => {
+  const target = tmp("u1-install-stale-");
+  try {
+    writeRawState(target, {
+      schemaVersion: 1,
+      installerVersion: "test",
+      agentId: "claude-code",
+      targetRoot: target,
+      createdAt: "2025-01-01T00:00:00Z",
+      updatedAt: "2025-01-01T00:00:00Z",
+      managedFiles: [],
+      installations: [
+        { selectionId: "sample:retired-skill", selectionKind: "skill", installMode: "direct", installerVersion: "test", installedAt: "2025-01-01T00:00:00Z" },
+      ],
+    });
+    await assert.rejects(
+      () => install(base({ target, selectionIds: ["sample:hello-world"] })),
+      (e) => e.code === "ERR_NOT_INSTALLED" && e.details.unknownSelections.includes("sample:retired-skill"),
+      "install must surface stale state selection before proceeding",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("export: stale state.json blocks with actionable error", async () => {
+  const target = tmp("u1-export-stale-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const state = injectStaleSelection(readState(target), "sample:retired-x");
+    writeRawState(target, state);
+    assert.throws(
+      () => exportCommand({ repoRoot: SAMPLE, adapterId: "claude-code", target, productConfig, env: process.env }),
+      (e) => e.code === "ERR_NOT_INSTALLED" && e.details.unknownSelections.includes("sample:retired-x"),
+      "export must refuse to emit stale selections",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("uninstall: stale state.json does NOT block (recovery semantics)", async () => {
+  const target = tmp("u1-uninstall-stale-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const state = injectStaleSelection(readState(target), "sample:retired-y");
+    writeRawState(target, state);
+    // Uninstalling a known selection must still work even when state has stale entries.
+    const r = await uninstall(base({ target, selectionIds: ["sample:hello-world"] }));
+    assert.equal(r.ok, true, "uninstall must complete on stale state to allow recovery");
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("uninstall: structurally-invalid state.json IS blocked by assertValidExistingState", async () => {
+  const target = tmp("u1-uninstall-invalid-");
+  try {
+    writeRawState(target, { schemaVersion: 1, managedFiles: "broken", installations: [] });
+    await assert.rejects(
+      () => uninstall(base({ target, selectionIds: ["sample:hello-world"] })),
+      (e) => e.code === "ERR_STATE_INVALID",
+      "uninstall must surface structural state corruption",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("update: structurally-invalid state.json IS blocked", async () => {
+  const target = tmp("u1-update-invalid-");
+  try {
+    writeRawState(target, { schemaVersion: 1, managedFiles: [], installations: "nope" });
+    await assert.rejects(
+      () => update(base({ target })),
+      (e) => e.code === "ERR_STATE_INVALID",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("repair: structurally-invalid state.json IS blocked (both scan and apply paths)", async () => {
+  const target = tmp("u1-repair-invalid-");
+  try {
+    writeRawState(target, { schemaVersion: 99, managedFiles: [], installations: [] });
+    await assert.rejects(
+      () => repair(base({ target, apply: false })),
+      (e) => e.code === "ERR_STATE_INVALID",
+    );
+    await assert.rejects(
+      () => repair(base({ target, apply: true })),
+      (e) => e.code === "ERR_STATE_INVALID",
+    );
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("doctorCommand: reports state-selections-known check when manifest loads", async () => {
+  const target = tmp("u1-doctor-stale-");
+  try {
+    await install(base({ target, selectionIds: ["sample:hello-world"] }));
+    const state = injectStaleSelection(readState(target), "sample:retired-z");
+    writeRawState(target, state);
+    const out = doctorCommand({ repoRoot: SAMPLE, adapterId: "claude-code", target, productConfig, env: process.env });
+    const check = out.reports[0].checks.find((c) => c.name === "state-selections-known");
+    assert.ok(check, "doctor must include state-selections-known check");
+    assert.equal(check.ok, false, "stale selection must fail the check");
+    assert.match(check.detail, /sample:retired-z/);
+  } finally { fs.rmSync(target, { recursive: true, force: true }); }
 });
