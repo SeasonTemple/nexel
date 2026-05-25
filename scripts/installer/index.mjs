@@ -60,6 +60,9 @@ export { validateManifest, exitCodeFor, formatFindings } from "./core/manifest/v
 export { SCHEMA_VERSION, PROFILES, CATEGORIES, HOSTS } from "./core/manifest/schema.mjs";
 export { detectDrift } from "./core/manifest/drift.mjs";
 
+// ---------- v0.7: marketplace lockstep helper ----------
+export { verifyMarketplaceLockstep } from "./core/marketplace-lockstep.mjs";
+
 // ---------- CLI command entry points (re-exported for advanced consumers; Unit 7 introduces createCli) ----------
 export {
   install,
