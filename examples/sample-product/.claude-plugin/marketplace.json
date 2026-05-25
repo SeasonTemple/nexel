@@ -1,0 +1,16 @@
+{
+  "name": "sample-product-marketplace",
+  "description": "Sample worked-example marketplace — nexel internal reference plugin.",
+  "owner": {
+    "name": "SeasonTemple",
+    "email": "noreply@github.com"
+  },
+  "plugins": [
+    {
+      "name": "sample-product",
+      "description": "Sample worked-example plugin demonstrating nexel's downstream layout.",
+      "version": "0.6.1",
+      "source": "."
+    }
+  ]
+}

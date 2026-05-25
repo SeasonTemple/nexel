@@ -1,0 +1,6 @@
+{
+  "name": "sample-product",
+  "version": "0.6.1",
+  "description": "Sample worked-example plugin demonstrating nexel's downstream layout.",
+  "skills": ["./skills/"]
+}

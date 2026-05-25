@@ -1,0 +1,15 @@
+{
+  "name": "sample-product-marketplace",
+  "interface": {
+    "displayName": "Nexel Sample Product",
+    "shortDescription": "Worked-example downstream marketplace for nexel."
+  },
+  "plugins": [
+    {
+      "name": "sample-product",
+      "source": { "source": "local", "path": "../.." },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools"
+    }
+  ]
+}
