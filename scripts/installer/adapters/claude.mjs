@@ -42,12 +42,26 @@ export function mapTargetPath(asset, manifest) {
   return defaultTargetMapping(manifest)(asset);
 }
 
-export function pluginInstallInstructions() {
+// SPI v1.2: accepts productConfig and interpolates productName / pluginName /
+// marketplaceName / repositoryUrl into the rendered text. Lazy-validates
+// `repositoryUrl` — missing field returns an actionable error string rather
+// than a misleading placeholder so the user fixes the config, not the
+// rendered output.
+export function pluginInstallInstructions(productConfig) {
+  if (!productConfig?.repositoryUrl) {
+    return [
+      "Claude Code plugin install unavailable — ProductConfig is missing `repositoryUrl`.",
+      "Add `repositoryUrl: \"https://...\"` to your agent-skills.config.mjs to enable plugin instructions.",
+    ].join("\n");
+  }
+  const productName = productConfig.productName;
+  const pluginName = productConfig.pluginName ?? productName;
+  const marketplaceName = productConfig.marketplaceName ?? `${productName}-marketplace`;
   return [
-    "Claude Code plugin install (recommended for full bundle):",
-    "  1. In Claude Code, run: /install-plugin",
-    "  2. Select marketplace source: your product's marketplace.json",
-    "  3. Select the plugin name your product publishes",
+    `Claude Code plugin install for ${productName} (recommended for full bundle):`,
+    `  1. Run: claude plugin marketplace add ${productConfig.repositoryUrl}`,
+    `  2. Run: claude plugin install ${pluginName}@${marketplaceName}`,
+    `  3. Refresh: claude plugin marketplace update ${marketplaceName}`,
     "Note: plugin install delivers skill content only.",
     "      Use direct mode if you need agents/ or rules/ alongside skills.",
   ].join("\n");

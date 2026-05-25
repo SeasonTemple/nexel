@@ -178,7 +178,7 @@ export async function planSelection({ repoRoot, adapterId, target, selectionIds,
   }
   const m = manifest || loadValidatedManifest(repoRoot, productConfig);
   const { adapter, targetRoot } = resolveAdapterAndTarget({ adapterId, target, env, productConfig });
-  if (adapter && !adapter.supportsDirect) assertSupportsDirect(adapter.id);
+  if (adapter && !adapter.supportsDirect) assertSupportsDirect(adapter.id, { productConfig });
 
   const mapTargetPath = adapter ? (asset) => adapter.mapTargetPath(asset, m) : undefined;
   const state = currentState !== undefined ? currentState : readState(targetRoot);
@@ -214,7 +214,7 @@ export async function install({
   const manifest = loadValidatedManifest(repoRoot, productConfig);
   const { adapter, targetRoot } = resolveAdapterAndTarget({ adapterId, target, env, productConfig });
   if (adapter) {
-    assertSupportsDirect(adapter.id);
+    assertSupportsDirect(adapter.id, { productConfig });
     if (!target && !allowNoCli) assertCliPresent(adapter.id, { env });
   }
 

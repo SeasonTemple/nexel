@@ -42,11 +42,21 @@ export function mapTargetPath(asset, manifest) {
   return defaultTargetMapping(manifest)(asset);
 }
 
-export function pluginInstallInstructions() {
+// SPI v1.2 — see claude.mjs for the contract notes.
+export function pluginInstallInstructions(productConfig) {
+  if (!productConfig?.repositoryUrl) {
+    return [
+      "Codex plugin install unavailable — ProductConfig is missing `repositoryUrl`.",
+      "Add `repositoryUrl: \"https://...\"` to your agent-skills.config.mjs to enable plugin instructions.",
+    ].join("\n");
+  }
+  const productName = productConfig.productName;
+  const pluginName = productConfig.pluginName ?? productName;
+  const marketplaceName = productConfig.marketplaceName ?? `${productName}-marketplace`;
   return [
-    "Codex plugin install (recommended for full bundle):",
-    "  1. Run: codex plugin marketplace add <your-product-marketplace-url>",
-    "  2. Run: codex plugin install <your-product-plugin-name>",
+    `Codex plugin install for ${productName} (recommended for full bundle):`,
+    `  1. Run: codex plugin marketplace add ${productConfig.repositoryUrl}`,
+    `  2. Run: codex plugin install ${pluginName}@${marketplaceName}`,
     "Note: plugin install delivers skill content only.",
     "      Use direct mode if you need agents/ or rules/ alongside skills.",
   ].join("\n");

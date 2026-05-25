@@ -79,17 +79,19 @@ export function mapTargetPath(asset, manifest) {
   throw e;
 }
 
-export function pluginInstallInstructions() {
+// SPI v1.2 — see claude.mjs for the contract notes.
+export function pluginInstallInstructions(productConfig) {
+  if (!productConfig?.repositoryUrl) {
+    return [
+      "OpenCode plugin install unavailable — ProductConfig is missing `repositoryUrl`.",
+      "Add `repositoryUrl: \"https://...\"` to your agent-skills.config.mjs to enable plugin instructions.",
+    ].join("\n");
+  }
+  const productName = productConfig.productName;
   return [
-    "OpenCode plugin install (alternative to direct mode):",
-    "  Add to your opencode.json:",
-    "    {",
-    "      \"plugins\": {",
-    "        \"<your-product-name>\": {",
-    "          \"git\": \"<your-product-git-url>\"",
-    "        }",
-    "      }",
-    "    }",
+    `OpenCode plugin install for ${productName} (alternative to direct mode):`,
+    `  1. git clone --depth 1 ${productConfig.repositoryUrl} <plugin-dir>`,
+    `  2. opencode plugin "<plugin-dir>" --global --force`,
     "Note: direct mode also installs rule reference files (cited by skills",
     "      via relative paths). AGENTS.md is never modified.",
   ].join("\n");

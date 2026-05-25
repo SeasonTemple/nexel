@@ -244,7 +244,7 @@ export async function gatherUninstallChoices({
   return { adapterIds: chosenList, selectionIds };
 }
 
-export async function gatherInstallChoices({ manifest, env = process.env, prompts = clack, adapters: adaptersOverride } = {}) {
+export async function gatherInstallChoices({ manifest, env = process.env, prompts = clack, adapters: adaptersOverride, productConfig } = {}) {
   const checkCancel = makeCancelCheck(prompts);
   prompts.intro("Agent skills installer");
 
@@ -271,7 +271,7 @@ export async function gatherInstallChoices({ manifest, env = process.env, prompt
       "plugin-adapter"
     );
     const adapter = getAdapter(adapterId);
-    return { mode: "plugin", adapterId, instructions: adapter.pluginInstallInstructions() };
+    return { mode: "plugin", adapterId, instructions: adapter.pluginInstallInstructions(productConfig) };
   }
 
   const directAdapters = adapters.filter((a) => a.supportsDirect);

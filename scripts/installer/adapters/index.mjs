@@ -43,8 +43,8 @@ export function listAdapterStatus({ override, env } = {}) {
   return DEFAULT_REGISTRY.list({ override, env });
 }
 
-export function assertSupportsDirect(adapterId) {
-  return DEFAULT_REGISTRY.assertSupportsDirect(adapterId);
+export function assertSupportsDirect(adapterId, opts) {
+  return DEFAULT_REGISTRY.assertSupportsDirect(adapterId, opts);
 }
 
 export function assertCliPresent(adapterId, { env = process.env } = {}) {

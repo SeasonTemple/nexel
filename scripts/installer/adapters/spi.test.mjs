@@ -53,7 +53,13 @@ test("SPI_DEFAULTS exposes all eight optional fields with sensible defaults", ()
   }
   assert.deepEqual([...SPI_DEFAULTS.supportedAssetTypes], ["skill", "agent", "rule"]);
   assert.equal(typeof SPI_DEFAULTS.pluginInstallInstructions, "function");
-  assert.equal(SPI_DEFAULTS.pluginInstallInstructions(), "");
+  // SPI v1.2: pluginInstallInstructions now accepts productConfig. The identity
+  // default returns "" for any input. Function.length === 1 is the visible
+  // signature signal of the v1.2 contract (NOT a stability promise — see
+  // spi.mjs SPI evolution policy).
+  assert.equal(SPI_DEFAULTS.pluginInstallInstructions.length, 1, "v1.2 arity = 1");
+  assert.equal(SPI_DEFAULTS.pluginInstallInstructions(), "", "callable with no args (backward-compat path)");
+  assert.equal(SPI_DEFAULTS.pluginInstallInstructions({ productName: "demo" }), "", "callable with productConfig");
   assert.equal(SPI_DEFAULTS.supportsDirect, false);
   assert.equal(SPI_DEFAULTS.cliBinary, "");
   assert.equal(SPI_DEFAULTS.cliInstallUrl, "");
@@ -243,4 +249,46 @@ test("adapter modules do not embed env-derived values at load time", async () =>
   const refreshed = await import("./claude.mjs");
   const after = { id: refreshed.id, displayName: refreshed.displayName, supportsDirect: refreshed.supportsDirect };
   assert.deepEqual(after, before);
+});
+
+// --- U4 (plan 2026-05-25-001): SPI v1.2 pluginInstallInstructions ---
+
+const sampleProductConfigForTests = {
+  productName: "sample-product",
+  pluginName: "sample-product",
+  marketplaceName: "sample-product-marketplace",
+  repositoryUrl: "https://github.com/SeasonTemple/nexel",
+};
+
+test("v1.2 forward-compat: old-style () => string adapter still satisfies v1.2 contract", () => {
+  // A pre-v1.2 adapter implements pluginInstallInstructions with zero args.
+  // JavaScript silently ignores extra arguments, so applyDefaults + a v1.2
+  // caller can hand it a productConfig and get back the unchanged string.
+  const legacy = makeMinimalAdapter({ pluginInstallInstructions: () => "legacy text" });
+  const prepared = applyDefaults(legacy);
+  assert.equal(prepared.pluginInstallInstructions(sampleProductConfigForTests), "legacy text",
+    "extra productConfig arg must not break the legacy single-arg adapter");
+});
+
+test("v1.2 forward-compat: invoking without productConfig still resolves the default", () => {
+  // Some callers (probe paths, error formatters) may not have productConfig
+  // wired. The default must remain safe-to-call with no arguments.
+  const minimal = applyDefaults(makeMinimalAdapter());
+  assert.equal(minimal.pluginInstallInstructions(), "");
+  assert.equal(minimal.pluginInstallInstructions(undefined), "");
+});
+
+test("claude adapter v1.2: interpolates productName / pluginName / marketplaceName / repositoryUrl", () => {
+  const text = claude.pluginInstallInstructions(sampleProductConfigForTests);
+  assert.match(text, /sample-product/, "must mention productName");
+  assert.match(text, /https:\/\/github\.com\/SeasonTemple\/nexel/, "must mention repositoryUrl");
+  assert.match(text, /sample-product@sample-product-marketplace/, "must compose pluginName@marketplaceName");
+  assert.doesNotMatch(text, /<your-product/i, "must NOT contain placeholder tokens");
+});
+
+test("claude adapter v1.2: lazy-validates missing repositoryUrl with actionable error", () => {
+  const text = claude.pluginInstallInstructions({ productName: "demo" });
+  assert.match(text, /unavailable/);
+  assert.match(text, /repositoryUrl/);
+  assert.match(text, /agent-skills\.config\.mjs/);
 });

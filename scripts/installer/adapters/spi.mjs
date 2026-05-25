@@ -1,4 +1,4 @@
-// Adapter SPI v1.1 contract — single source of truth.
+// Adapter SPI v1.2 contract — single source of truth.
 //
 // Required-4 fields (every adapter must export these):
 //   id            : string         unique identifier
@@ -9,7 +9,14 @@
 // Optional-8 fields (kernel-provided defaults when missing):
 //   mapTargetPath              : (asset, manifest, productConfig) => relPath
 //   supportedAssetTypes        : ["skill", "agent", "rule"] subset
-//   pluginInstallInstructions  : () => string
+//   pluginInstallInstructions  : (productConfig) => string         (v1.2)
+//                                  Was () => string in v1.1. Old single-arg
+//                                  adapter implementations remain forward-
+//                                  compatible because JS ignores extra args;
+//                                  v1.2 adapters interpolate productConfig
+//                                  fields (productName / pluginName /
+//                                  marketplaceName / repositoryUrl) into the
+//                                  rendered output (see ADR-0010).
 //   supportsDirect             : boolean
 //   cliBinary                  : string ("" = skip CLI presence check)
 //   cliInstallUrl              : string
@@ -22,13 +29,22 @@
 //                                  (reference-equality is observed).
 //
 // SPI evolution policy:
-//   - Minor versions: only add NEW optional fields with kernel defaults.
-//     Existing adapters continue to work. (v1.1 added transformAssetContent.)
+//   - Minor versions: add NEW optional fields with kernel defaults, OR
+//     widen the signature of an existing optional field when old shapes
+//     remain forward-compatible (e.g., v1.2 widened
+//     pluginInstallInstructions from () to (productConfig); a v1.1 adapter
+//     that ignores the new arg still satisfies the v1.2 contract).
+//     (v1.1 added transformAssetContent; v1.2 widened
+//     pluginInstallInstructions.)
 //   - Major versions: may add new REQUIRED fields. Existing adapters must
 //     update to declare them.
 //   - String values of ERR_ADAPTER_INVALID / ERR_ADAPTER_ID_COLLISION /
 //     ERR_NO_ADAPTERS / ERR_TRANSFORM_FAILED are part of the public
 //     stability contract.
+//   - `SPI_DEFAULTS` reference identity and individual `Function.length`
+//     are NOT part of the contract. Adapter authors must not rely on
+//     either to detect "no override" — that needle reflects kernel-internal
+//     defaults that can be tightened across minor versions.
 //
 // Import side-effect ban (enforced by spi.test.mjs):
 //   Adapter modules must NOT perform any IO (env reads, whichSync calls,
@@ -66,7 +82,10 @@ const FUNCTION_REQUIRED = new Set(["detectTargetRoot", "detectStatus"]);
 export const SPI_DEFAULTS = Object.freeze({
   mapTargetPath: (asset, manifest /*, productConfig */) => defaultTargetMapping(manifest)(asset),
   supportedAssetTypes: Object.freeze(["skill", "agent", "rule"]),
-  pluginInstallInstructions: () => "",
+  // v1.2 — accepts productConfig so adapter renderers can interpolate
+  // marketplace URL, plugin name, etc. Identity default returns "" (empty
+  // string) for any input so callers that ignore the result still work.
+  pluginInstallInstructions: (_productConfig) => "",
   supportsDirect: false,
   cliBinary: "",
   cliInstallUrl: "",
@@ -205,7 +224,7 @@ export function createAdapterRegistry(adapters) {
     list({ override, env } = {}) {
       return ids.map((id) => byId.get(id).detectStatus({ override, env }));
     },
-    assertSupportsDirect(adapterId) {
+    assertSupportsDirect(adapterId, { productConfig } = {}) {
       const a = registry.get(adapterId);
       if (!a.supportsDirect) {
         const e = new Error(
@@ -213,7 +232,7 @@ export function createAdapterRegistry(adapters) {
         );
         e.code = ERR_DIRECT_UNSUPPORTED;
         e.adapterId = adapterId;
-        e.pluginInstallInstructions = a.pluginInstallInstructions();
+        e.pluginInstallInstructions = a.pluginInstallInstructions(productConfig);
         throw e;
       }
       return a;
