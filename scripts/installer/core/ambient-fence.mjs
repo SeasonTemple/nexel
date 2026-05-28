@@ -3,6 +3,7 @@ import path from "node:path";
 import lockfile from "proper-lockfile";
 
 import { ERR_LOCKED } from "./errors.mjs";
+import { snapshotPreLockStats, verifyPostLockIntegrity } from "./symlink-safe.mjs";
 
 // CLI-agnostic ambient-context fence writer.
 //
@@ -139,13 +140,12 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   // `~/.claude/CLAUDE.md` → a sensitive file) would silently extend our
   // ambient-context fence into whatever the symlink points at. Review finding
   // adv-004. Use lstat to detect the symlink without following it.
-  if (fs.existsSync(targetPath)) {
-    const lstat = fs.lstatSync(targetPath);
-    if (lstat.isSymbolicLink()) {
-      throw new Error(
-        `writeAmbientFence: refusing to write through symlink at ${targetPath}; resolve the symlink or move the file before activating`,
-      );
-    }
+  // ADR-0019 (v0.9.0): pre-lock snapshot for post-lock TOCTOU verify.
+  const targetPreLockStats = snapshotPreLockStats(targetPath);
+  if (targetPreLockStats?.isSymbolicLink()) {
+    throw new Error(
+      `writeAmbientFence: refusing to write through symlink at ${targetPath}; resolve the symlink or move the file before activating`,
+    );
   }
 
   // Ensure parent dir exists before the lock — proper-lockfile creates a
@@ -153,19 +153,16 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   // targetPath to be present.
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
 
-  // v0.8.5 adv-r5-C symlink-at-lock DOS defense. If `<target>.lock` is a
-  // symlink (typically a planted attack: ln -s /etc/hosts <target>.lock),
-  // proper-lockfile's stale-cleanup never fires against it and every
-  // subsequent activate is permanently blocked with ELOCKED. Mirror the
-  // v0.8.3 symlink-at-target defense at the lock path before locking.
+  // v0.8.5 adv-r5-C symlink-at-lock DOS defense. ADR-0019 (v0.9.0):
+  // pre-lock snapshot for post-lock TOCTOU verify (lockPathMode: true to
+  // skip ino/dev pinning — proper-lockfile stale-recovery rmdir+mkdir
+  // would false-positive otherwise).
   const lockPath = `${targetPath}.lock`;
-  if (fs.existsSync(lockPath)) {
-    const lockLstat = fs.lstatSync(lockPath);
-    if (lockLstat.isSymbolicLink()) {
-      throw new Error(
-        `writeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
-      );
-    }
+  const lockPreLockStats = snapshotPreLockStats(lockPath);
+  if (lockPreLockStats?.isSymbolicLink()) {
+    throw new Error(
+      `writeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
+    );
   }
 
   // v0.8.4 #1 (adv-003) race defense: serialize concurrent activates
@@ -197,6 +194,20 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
     throw e;
   }
   try {
+    // ADR-0019 post-lock TOCTOU verify. Target uses full ino+dev pinning;
+    // lockPath uses lockPathMode (symlink-only) because proper-lockfile
+    // owns the lock dir's lifecycle (stale recovery does rmdir+mkdir).
+    verifyPostLockIntegrity({
+      targetPath,
+      preLockStats: targetPreLockStats,
+      label: "writeAmbientFence",
+    });
+    verifyPostLockIntegrity({
+      targetPath: lockPath,
+      preLockStats: lockPreLockStats,
+      label: "writeAmbientFence(lockPath)",
+      lockPathMode: true,
+    });
     return writeAmbientFenceLocked({ targetPath, productName, contentBlock, logger });
   } finally {
     release();
@@ -313,27 +324,21 @@ export function removeAmbientFence({ targetPath, productName, logger }) {
     return { action: "noop", changed: false, targetPath, reason: "host file does not exist" };
   }
 
-  // Target-symlink refusal (adv-004 parity with writeAmbientFence:142-149).
-  // Without this, deactivate through a symlink would mutate whatever the
-  // symlink resolves to — same threat model as the activate side.
-  const targetLstat = fs.lstatSync(targetPath);
-  if (targetLstat.isSymbolicLink()) {
+  // Target-symlink refusal (adv-004 parity) + ADR-0019 pre-lock snapshot.
+  const targetPreLockStats = snapshotPreLockStats(targetPath);
+  if (targetPreLockStats?.isSymbolicLink()) {
     throw new Error(
       `removeAmbientFence: refusing to write through symlink at ${targetPath}; resolve the symlink or move the file before deactivating`,
     );
   }
 
-  // Lock-symlink defense (adv-r5-C parity with writeAmbientFence:161-169).
-  // Mirror the v0.8.5 symlink-at-lock DOS defense on the remove path so a
-  // planted lock symlink cannot permanently block deactivate either.
+  // Lock-symlink defense (adv-r5-C parity) + ADR-0019 pre-lock snapshot.
   const lockPath = `${targetPath}.lock`;
-  if (fs.existsSync(lockPath)) {
-    const lockLstat = fs.lstatSync(lockPath);
-    if (lockLstat.isSymbolicLink()) {
-      throw new Error(
-        `removeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
-      );
-    }
+  const lockPreLockStats = snapshotPreLockStats(lockPath);
+  if (lockPreLockStats?.isSymbolicLink()) {
+    throw new Error(
+      `removeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
+    );
   }
 
   // proper-lockfile reuse: same lock path as writeAmbientFence so concurrent
@@ -357,6 +362,19 @@ export function removeAmbientFence({ targetPath, productName, logger }) {
   }
 
   try {
+    // ADR-0019 post-lock TOCTOU verify (covers the new removeAmbientFence
+    // path too — completes the "Phase 6 cleanup" referenced in plan).
+    verifyPostLockIntegrity({
+      targetPath,
+      preLockStats: targetPreLockStats,
+      label: "removeAmbientFence",
+    });
+    verifyPostLockIntegrity({
+      targetPath: lockPath,
+      preLockStats: lockPreLockStats,
+      label: "removeAmbientFence(lockPath)",
+      lockPathMode: true,
+    });
     const before = fs.readFileSync(targetPath, "utf8");
     const re = fenceRegex(productName);
     const match = before.match(re);

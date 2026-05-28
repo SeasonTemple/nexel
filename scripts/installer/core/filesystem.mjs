@@ -21,6 +21,7 @@ import {
   ERR_STATE_PARSE,
   ERR_INVALID_STATE,
 } from "./errors.mjs";
+import { snapshotPreLockStats, verifyPostLockIntegrity } from "./symlink-safe.mjs";
 
 export const TEXT_EXTENSIONS = Object.freeze([".md", ".json", ".mjs", ".js", ".yaml", ".yml", ".txt"]);
 const TEXT_EXT_SET = new Set(TEXT_EXTENSIONS);
@@ -300,13 +301,27 @@ export function stageWrite(stagingDir, relPath, content) {
 }
 
 export function promoteStagedFiles(stagingDir, targetRoot, relPaths) {
+  // ADR-0019 staging-promote TOCTOU defense. Snapshot each dst's lstat
+  // pre-lock; re-verify post-lock and re-walk parent segments before
+  // renameSync to close the lstat→renameSync race.
+  const dstPaths = relPaths.map((rel) => path.join(targetRoot, rel));
+  const preLockStats = dstPaths.map((dst) => snapshotPreLockStats(dst));
   const promoted = [];
-  for (const rel of relPaths) {
+  for (let i = 0; i < relPaths.length; i++) {
+    const rel = relPaths[i];
     const src = path.join(stagingDir, rel);
-    const dst = path.join(targetRoot, rel);
+    const dst = dstPaths[i];
     assertPathInsideRoot(targetRoot, dst);
     assertNoSymlinkOnPath(path.dirname(dst), targetRoot);
+    verifyPostLockIntegrity({
+      targetPath: dst,
+      preLockStats: preLockStats[i],
+      label: `promoteStagedFiles[${rel}]`,
+    });
     fs.mkdirSync(path.dirname(dst), { recursive: true });
+    // Re-walk parent segments immediately before renameSync to close the
+    // gap between the dst-only verify and the actual mutation.
+    assertNoSymlinkOnPath(path.dirname(dst), targetRoot);
     fs.renameSync(src, dst);
     promoted.push(dst);
   }
