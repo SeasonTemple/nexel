@@ -1,0 +1,86 @@
+#!/usr/bin/env sh
+# nexel repo pre-push: gate tag pushes on a per-tag review marker bound
+# to the tag's referenced commit SHA.
+#
+# When a `git push` includes any `refs/tags/v*` ref, this hook checks for
+# `.nexel/release-blessed-<tag>` (regular file, not a symlink) and verifies
+# its embedded `commit=<sha>` line matches the local_sha being pushed for
+# that tag. The marker is created by `npm run release:bless -- vX.Y.Z`
+# after a green `ce-code-review` pass.
+#
+# Rationale: three consecutive releases (v0.7.0 / v0.8.0 / v0.8.1) shipped
+# without prior review and each required a round-1 fixup commit, including
+# two live-verified exploits. Memory + CLAUDE.md + release-workflow.md
+# proved insufficient. v0.8.3 adds this mechanical gate; v0.8.3 round-2
+# review showed the file-existence-only check was a one-keystroke bypass,
+# so this revision binds the marker to the tag's commit SHA and rejects
+# symlinks and tag deletions correctly.
+#
+# Non-tag pushes (e.g., `git push origin main`) pass through unchanged.
+# Tag DELETIONS (`git push origin :v0.8.3`) pass through — there is no
+# code to review on a delete.
+# Stdin format per `git push` hook contract:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# per line.
+#
+# Documented bypasses (emergency only, audit if used in normal flow):
+#   git push --no-verify origin v0.8.3
+#   HUSKY=0 git push origin v0.8.3
+#   git -c core.hooksPath=/dev/null push origin v0.8.3
+
+set -e
+
+ZERO_SHA="0000000000000000000000000000000000000000"
+FAILURES=""
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/v*)
+      # Tag deletion: local_sha is all zeros. Nothing to review on a delete.
+      if [ "$local_sha" = "$ZERO_SHA" ]; then
+        continue
+      fi
+
+      tag="${remote_ref#refs/tags/}"
+      marker=".nexel/release-blessed-${tag}"
+
+      # Reject symlinks — a symlink-to-regular-file would pass `-f` and let
+      # an empty/spoofed marker slip the gate.
+      if [ -L "$marker" ]; then
+        FAILURES="${FAILURES}\n  ${tag}: marker is a symlink — rejected. Remove ${marker} and re-run npm run release:bless -- ${tag}."
+        continue
+      fi
+
+      if [ ! -f "$marker" ]; then
+        FAILURES="${FAILURES}\n  ${tag}: no bless marker. Run npm run release:bless -- ${tag} after ce-code-review."
+        continue
+      fi
+
+      # Extract committed SHA from the marker. The expected line shape is
+      # `commit=<40-char hex>`. Anything else is treated as untrusted.
+      marker_sha=$(grep -E '^commit=[0-9a-f]{40}$' "$marker" | head -1 | cut -d= -f2 || true)
+      if [ -z "$marker_sha" ]; then
+        FAILURES="${FAILURES}\n  ${tag}: bless marker missing or malformed commit=<sha> line. Re-run npm run release:bless -- ${tag}."
+        continue
+      fi
+
+      if [ "$marker_sha" != "$local_sha" ]; then
+        FAILURES="${FAILURES}\n  ${tag}: bless marker bound to ${marker_sha} but push refers to ${local_sha}. The tag was amended or rewritten since bless. Re-run npm run release:bless -- ${tag}."
+        continue
+      fi
+      ;;
+  esac
+done
+
+if [ -n "$FAILURES" ]; then
+  printf 'pre-push: refusing to push tag(s):%b\n' "$FAILURES" >&2
+  echo "" >&2
+  echo "Pre-tag code review is mandatory (CLAUDE.md 'Mandatory release-time review gate'," >&2
+  echo "docs/release-workflow.md Normal path step 4)." >&2
+  echo "" >&2
+  echo "Emergency bypass (use only when reviewer chain is unavailable; audit if used):" >&2
+  echo "  git push --no-verify origin <tag>" >&2
+  exit 1
+fi
+
+exit 0

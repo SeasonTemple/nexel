@@ -51,11 +51,14 @@ export function discoverCodexInstructions(skillsDir, logger = console) {
   if (!fs.existsSync(skillsDir)) return [];
 
   const out = [];
-  // Sort entries by codepoint so fence body order is deterministic across
-  // filesystems AND locales. v0.8.1 used `localeCompare` which leaks the
-  // host's collation (e.g., tr_TR orders `İ` differently from en_US),
-  // breaking the byte-stable idempotency contract across CI runners with
-  // different `LANG`. v0.8.2 uses a codepoint comparator instead.
+  // Sort entries by UTF-16 code-unit order (JS string `<` semantics) so fence
+  // body order is deterministic across filesystems AND locales. v0.8.1 used
+  // `localeCompare` which leaks the host's collation (e.g., tr_TR orders
+  // `İ` differently from en_US), breaking the byte-stable idempotency
+  // contract across CI runners with different `LANG`. v0.8.2 switched to
+  // this code-unit comparator. (Earlier comments called it "codepoint" —
+  // technically inaccurate for surrogate pairs but practically equivalent
+  // for the determinism property the contract needs.)
   const entries = fs
     .readdirSync(skillsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())

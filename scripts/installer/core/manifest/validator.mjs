@@ -212,6 +212,10 @@ function validateSkillFrontmatterMatch(skill, skillMdPath, findings) {
 function validateOpenCodeInstructionsFile(skill, skillMdPath, frontmatterText, findings) {
   const result = readHostInstructions(frontmatterText);
   if (result === null) return;
+  // isValidRelativeSkillPath rejects values containing `..` segments,
+  // absolute paths, quotes, whitespace, and empty strings. The defense-
+  // in-depth path-escape branch that used to live here was provably
+  // unreachable given this predicate (v0.8.3 cleanup #9, T-GAP-02).
   if (!isValidRelativeSkillPath(result.value)) return;
 
   // P2-F: cite the actual frontmatter key that supplied the value so the user
@@ -222,10 +226,6 @@ function validateOpenCodeInstructionsFile(skill, skillMdPath, frontmatterText, f
 
   const skillDir = path.dirname(skillMdPath);
   const instructionPath = path.resolve(skillDir, relativeInstructionPath);
-  if (!instructionPath.startsWith(`${skillDir}${path.sep}`)) {
-    pushError(findings, "skills", skill.id, `${sourceKey} path escapes skill directory: ${relativeInstructionPath}`);
-    return;
-  }
   if (!fs.existsSync(instructionPath)) {
     pushError(findings, "skills", skill.id, `${sourceKey} file does not exist: ${path.posix.join(skill.sourcePath, relativeInstructionPath)}`);
   }

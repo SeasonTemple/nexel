@@ -53,9 +53,20 @@ assets manually from a local checkout except as an emergency repair.
    git add package.json package-lock.json docs/release-notes/vX.Y.Z.md
    git commit -m "release: vX.Y.Z"
    git tag -a vX.Y.Z -m "vX.Y.Z"
+   npm run release:bless -- vX.Y.Z   # required after step 4's review pass
    git push origin main
    git push origin vX.Y.Z
    ```
+
+   The bless step (`npm run release:bless -- vX.Y.Z`) creates a
+   SHA-bound marker at `.nexel/release-blessed-vX.Y.Z`. The husky
+   pre-push hook (`.husky/pre-push`) refuses any tag push without a
+   matching marker — this is the mechanical enforcement of step 4.
+   Amending the commit or force-retagging after bless invalidates the
+   marker (SHA mismatch); re-bless after fixing. Emergency bypass for
+   broken-reviewer-chain hotfixes: `git push --no-verify origin
+   vX.Y.Z` (audit any use of this in release retrospective). See
+   ADR-0013 for the full design.
 
 6. GitHub Actions creates the release and uploads:
 

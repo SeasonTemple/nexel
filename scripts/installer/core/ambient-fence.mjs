@@ -86,7 +86,12 @@ function composeFenceBlock(productName, contentBlock) {
 function isFenceTrusted(fileText, productName) {
   const m = fileText.match(fenceRegex(productName));
   if (!m) return true; // No existing fence — nothing to overwrite, trivially safe.
-  const block = m[0];
+  // Normalize CRLF → LF so editor-touched managed fences (e.g., opened in a
+  // Windows editor that rewrote line endings) are still recognized as
+  // trusted. v0.8.3 fix (#7 / C3): without this normalization the sentinel's
+  // `\n` separator fails `startsWith` on CRLF files even though the
+  // surrounding fence is structurally intact.
+  const block = m[0].replace(/\r\n/g, "\n");
   // Expected shape inside the matched block:
   //   <begin-marker>\n<MANAGED_HEADER>\n...body...\n<end-marker>
   // Slice from the first newline after the begin marker; the sentinel must
@@ -153,6 +158,21 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   const before = fs.readFileSync(targetPath, "utf8");
   const re = fenceRegex(productName);
 
+  // adv-002 trusted-path orphan refusal (v0.8.3 #2). fenceRegex is non-global
+  // and lazy — if the file contains, say, three BEGIN markers and one END
+  // marker, the regex spans the FIRST BEGIN through the END, silently
+  // engulfing the other two BEGINs (and the user prose between them) on
+  // replace. v0.8.2 closed the orphan case on the append path; v0.8.3 closes
+  // it on the trusted path by requiring exactly one BEGIN and exactly one
+  // END marker for this product before allowing a splice.
+  const beginCount = (before.match(new RegExp(escapeRegex(beginMarker(productName)), "g")) || []).length;
+  const endCount = (before.match(new RegExp(escapeRegex(endMarker(productName)), "g")) || []).length;
+  if (beginCount > 1 || endCount > 1 || beginCount !== endCount) {
+    throw new Error(
+      `writeAmbientFence: unbalanced fence markers for "${productName}" in ${targetPath} (${beginCount} BEGIN, ${endCount} END) — refusing to splice; would silently engulf prose between mismatched markers. Inspect and clean up the file manually before re-running.`,
+    );
+  }
+
   if (re.test(before)) {
     // P1#6 defense: refuse to overwrite a marker pair that lacks the
     // managed-header sentinel. The markers may be user prose copied from
@@ -173,18 +193,9 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
     return { action: "updated", changed: true, targetPath };
   }
 
-  // Orphan-marker check (adv-006 v0.8.2 defense). The fence regex requires a
-  // matched BEGIN/END pair. If we reach this branch the regex failed, but the
-  // file may still contain an unpaired BEGIN marker for this product (user
-  // prose copied from documentation, or a previous fence whose END marker was
-  // hand-deleted). Appending a new fence under that orphan would silently
-  // engulf the prose between the orphan BEGIN and our new END on the next
-  // update round. Refuse instead.
-  if (before.includes(beginMarker(productName)) || before.includes(endMarker(productName))) {
-    throw new Error(
-      `writeAmbientFence: orphan fence marker for "${productName}" in ${targetPath} (BEGIN without matching END, or END without matching BEGIN) — refusing to append; would engulf any prose between the orphan and the new fence on subsequent updates. Inspect and remove the orphan markers manually before re-running.`,
-    );
-  }
+  // adv-006 / v0.8.2 orphan-marker defense is now subsumed by the unbalanced-
+  // marker count check above. By the time we reach this branch, beginCount
+  // and endCount are both 0 — no orphan can exist for this product.
 
   // Append fence to end of file, ensuring exactly one blank line of
   // separation from any prior content. Always end with a single trailing

@@ -236,6 +236,52 @@ test("productName validation rejects unsafe values (adv-005 fixup)", () => {
   }
 });
 
+test("trusts a CRLF-converted managed fence (editor round-trip tolerance, v0.8.3 #7)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Write a fence with LF, then convert to CRLF as an editor (e.g.,
+    // Windows Notepad) might do. isFenceTrusted must still recognize it.
+    writeAmbientFence({ targetPath: target, productName: "crlf-test", contentBlock: "body content" });
+    const lfContent = fs.readFileSync(target, "utf8");
+    fs.writeFileSync(target, lfContent.replace(/\n/g, "\r\n"));
+
+    // Re-running with the same content should be recognized as an
+    // existing trusted fence (no orphan refusal, no untrusted refusal).
+    const result = writeAmbientFence({
+      targetPath: target,
+      productName: "crlf-test",
+      contentBlock: "body content",
+    });
+    assert.equal(result.action, "updated");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("refuses trusted path when target file has unbalanced begin/end markers (adv-002 v0.8.3 #2)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Two BEGIN markers but one END — lazy regex would otherwise span from
+    // FIRST BEGIN to single END, silently swallowing user prose between
+    // SECOND BEGIN and END on replace.
+    fs.writeFileSync(
+      target,
+      `<!-- nexel:dup:begin -->\n${MANAGED_HEADER}\nold managed body\n<!-- nexel:dup:begin -->\nuser-pasted prose between markers\n<!-- nexel:dup:end -->\n`,
+    );
+    assert.throws(
+      () => writeAmbientFence({ targetPath: target, productName: "dup", contentBlock: "new body" }),
+      /unbalanced fence markers/i,
+    );
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("user-pasted prose between markers"));
+    assert.ok(!after.includes("new body"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("refuses append path when target file contains an orphan begin marker (adv-006 v0.8.2)", () => {
   const dir = makeTempDir();
   try {
@@ -250,7 +296,10 @@ test("refuses append path when target file contains an orphan begin marker (adv-
     );
     assert.throws(
       () => writeAmbientFence({ targetPath: target, productName: "acme", contentBlock: "kernel body" }),
-      /orphan fence marker/i,
+      // v0.8.3 unified orphan/unbalanced detection: orphan-BEGIN (1 BEGIN, 0 END)
+      // surfaces as "unbalanced fence markers" — the more general defense
+      // subsumes the v0.8.2 orphan-only check.
+      /unbalanced fence markers/i,
     );
     const after = fs.readFileSync(target, "utf8");
     assert.ok(after.includes("things I want to keep"));
