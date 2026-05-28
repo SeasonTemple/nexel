@@ -67,8 +67,13 @@ jobs:
           else
             range="${GITHUB_REF_NAME}"
           fi
-          if git log --format=%B "$range" | grep -E '(\-\-no-verify|HUSKY=0|core\.hooksPath=/dev/null)\b'; then
-            echo "review-gate: commit message in ${range} advertises a hook bypass; refusing to bless." >&2
+          # Phase 6 hotfix: match the COMMAND form (verb + flag) so
+          # documentation that mentions --no-verify / HUSKY=0 in prose
+          # does not false-positive. The scan targets actual invocations:
+          # `git push/commit/rebase/tag/merge ... --no-verify`,
+          # `HUSKY=0 git ...`, or `core.hooksPath=/dev/null git ...`.
+          if git log --format=%B "$range" | grep -E '(git[[:space:]]+(push|commit|rebase|tag|merge)[[:space:]][^[:space:]]*[[:space:]]+--no-verify|HUSKY=0[[:space:]]+git|core\.hooksPath=/dev/null[[:space:]]+git)'; then
+            echo "review-gate: commit message in ${range} advertises a hook bypass invocation; refusing to bless." >&2
             exit 1
           fi
           echo "blessed=true" >> "$GITHUB_OUTPUT"
