@@ -22,8 +22,8 @@
         "rules": ["rules/sample-rule.md"]
       }
     },
-    "sample:host-context": {
-      "id": "sample:host-context",
+    "sample:sample-host-context": {
+      "id": "sample:sample-host-context",
       "dirname": "sample-host-context",
       "sourcePath": "skills/sample-host-context",
       "category": "setup",

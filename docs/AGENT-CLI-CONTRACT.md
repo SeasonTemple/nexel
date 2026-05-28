@@ -32,7 +32,7 @@ all are product-supplied via `ProductConfig`.
 
 ## 1. Verbs
 
-Eleven kernel verbs are always available (plus `help`). All accept `--json` for machine-readable output, with one exception: `export` **always** emits a JSON envelope (it is a machine-to-machine format) — passing `--json` to it is a no-op, not an error.
+Twelve kernel verbs are always available (plus `help`). All accept `--json` for machine-readable output, with one exception: `export` **always** emits a JSON envelope (it is a machine-to-machine format) — passing `--json` to it is a no-op, not an error.
 
 | Verb | Purpose |
 |---|---|
@@ -47,7 +47,58 @@ Eleven kernel verbs are always available (plus `help`). All accept `--json` for 
 | `export` | Dump the installed selection set as JSON to stdout |
 | `import` | Read a selection-set JSON envelope from stdin and install |
 | `doctor` | Health-check the installer environment per adapter |
+| `activate` | Write ambient-context fences (`CLAUDE.md` / `AGENTS.md`) for installed skills |
 | `help` | Print usage (handled in the CLI shell, not dispatched) |
+
+### `activate` (v0.8.0)
+
+`activate` writes ambient-context fences referencing installed skills so the
+host CLI's default context loads them. It is install-time post-processing,
+not part of the SPI hook surface.
+
+- `--target <id>` — `claude` | `codex` | `opencode` (comma-separate to combine).
+  Default targets are `claude,codex`. `--target=opencode` is **refused** with
+  `ERR_ACTIVATE_OPENCODE_REFUSED` because OpenCode activation happens at
+  OpenCode boot via the `nexel/adapters/opencode-plugin` runtime helper, not
+  via this verb.
+- `--scope user|project` — `user` writes home (`~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md`); `project` writes to `./CLAUDE.md` / `./AGENTS.md`
+  under `cwd`. Default `project`. Invalid value yields
+  `ERR_ACTIVATE_INVALID_SCOPE`.
+- `--skills-dir <path>` — override the skills directory (default is the
+  product's `defaultSkillsDir`).
+- `--dry-run` — report per-adapter `would-activate` without writing.
+- `--json` — emit a machine-readable envelope on stdout.
+
+**`--json` envelope (success and refused/failed cases both):**
+
+```json
+{
+  "ok": true,
+  "scope": "project",
+  "skillsDir": "/abs/path/skills",
+  "productName": "sample-product",
+  "dryRun": false,
+  "adapters": [
+    { "adapter": "claude", "status": "activated", "details": { "action": "updated", "changed": false, "targetPath": "...", "discoveredCount": 1 } },
+    { "adapter": "codex",  "status": "activated", "details": { ... } }
+  ]
+}
+```
+
+Per-adapter `status` is one of `activated` | `would-activate` | `refused`
+| `failed`. The `code` field is present on `refused` and `failed` entries
+only, carrying the typed `ERR_*` constant. Exit code is `0` when every
+requested adapter activated cleanly, non-zero when any refused or failed.
+
+Thrown precondition errors (invalid `--scope`, missing `productConfig`,
+unknown `--target`) follow the standard error envelope at §3.
+
+Fences are idempotent: re-running with no source changes produces
+byte-identical target files (`changed: false`). Fence markers carry the
+product name so multiple nexel-derived products coexist in one home file
+without overwriting each other. `activate` refuses to write through symlinked
+target files.
 
 ## 2. Non-interactive contract — REQUIRED for agents
 

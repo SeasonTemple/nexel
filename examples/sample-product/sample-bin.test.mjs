@@ -48,7 +48,7 @@ test("sample bin: list --json returns the sample manifest assets", () => {
   // 3 skills declared in sample.install.json (host-context added in v0.8 to exercise host-instructions:).
   assert.equal(out.skills.length, 3);
   const ids = out.skills.map((s) => s.id).sort();
-  assert.deepEqual(ids, ["sample:demo-bundle-skill", "sample:hello-world", "sample:host-context"]);
+  assert.deepEqual(ids, ["sample:demo-bundle-skill", "sample:hello-world", "sample:sample-host-context"]);
   // 1 bundle declared
   assert.equal(out.bundles.length, 1);
   assert.equal(out.bundles[0].id, "sample-demo");
@@ -60,7 +60,7 @@ test("sample bin: list text mode shows skill flags", () => {
   assert.match(r.stdout, /Skills \(3\):/);
   assert.match(r.stdout, /sample:hello-world/);
   assert.match(r.stdout, /sample:demo-bundle-skill/);
-  assert.match(r.stdout, /sample:host-context/);
+  assert.match(r.stdout, /sample:sample-host-context/);
   assert.match(r.stdout, /Bundles \(1\):/);
   assert.match(r.stdout, /sample-demo/);
 });

@@ -4,13 +4,17 @@ import assert from "node:assert/strict";
 import { strings } from "./strings.mjs";
 import { printHelp, renderHelp, hasVerbHelp } from "./help.mjs";
 
-// The 11 production verbs (everything dispatchable except `help` itself).
+// The 12 production verbs (everything dispatchable except `help` itself).
 const PRODUCTION_VERBS = [
   "install", "uninstall", "update", "list", "plan", "agents",
   "doctor", "repair", "export", "import", "validate",
   // v0.7: scaffold is opt-in (enablePluginScaffolder flag) but ships with
   // a per-verb help renderer so opt-in callers get --help coverage.
   "scaffold",
+  // v0.8: activate verb shipped with a per-verb help renderer covering
+  // --target / --scope / --skills-dir / --dry-run / --json (added in the
+  // round-1 review fixup; original v0.8 commit shipped without it).
+  "activate",
 ];
 
 // Sentinel that appears only in the composed full body (flagsBlock), never

@@ -17,7 +17,7 @@
       "installed": false
     },
     {
-      "id": "sample:host-context",
+      "id": "sample:sample-host-context",
       "category": "setup",
       "profile": "standalone",
       "description": "Demo skill exercising the unified host-instructions Skill Metadata key consumed by nexel activate.",

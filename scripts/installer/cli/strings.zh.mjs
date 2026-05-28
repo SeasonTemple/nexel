@@ -296,6 +296,35 @@ Example:
 
 Run '${binName} help' for the complete reference.
 `,
+      activate: ({ binName }) => `${binName} activate — 将 ambient context fence 写入 CLAUDE.md / AGENTS.md
+
+用法:
+  ${binName} activate [--target <id>] [--scope user|project] [flags]
+
+Flags:
+  --target <id>         claude | codex | opencode (逗号分隔可组合)
+                        默认: claude,codex。--target=opencode 会被拒绝 ——
+                        OpenCode 激活在 OpenCode 启动时通过 opencode-plugin
+                        入口完成，不经此 verb。
+  --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
+                          project → ./CLAUDE.md + ./AGENTS.md (默认)
+  --skills-dir <path>   覆盖 skills 目录 (默认: <productConfig.defaultSkillsDir>)
+  --dry-run             按 adapter 报告 would-activate；不实际写文件
+  --json                stdout 输出机器可读 envelope
+
+JSON envelope 中每个 adapter 条目: { adapter, status, code?, details }。
+状态值: activated | would-activate | refused | failed。
+
+幂等：源不变时重跑产生字节相同的 fence 文件。
+拒绝写入符号链接目标文件。
+
+示例:
+  ${binName} activate --scope=project --json
+  ${binName} activate --target=claude --dry-run
+  ${binName} activate --target=opencode    # exit 1 + ERR_ACTIVATE_OPENCODE_REFUSED
+
+运行 '${binName} help' 查看完整参考。
+`,
     }),
   }),
 

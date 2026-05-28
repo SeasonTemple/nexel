@@ -25,6 +25,20 @@ const BEGIN_SUFFIX = ":begin -->";
 const END_PREFIX = "<!-- nexel:";
 const END_SUFFIX = ":end -->";
 
+// productName must be a single identifier-shaped token. Embedding newlines,
+// whitespace, or shell-control chars in the fence marker `<!-- nexel:<name>:begin -->`
+// would produce malformed HTML comment markers (review finding adv-005,
+// retroactive fixup; mirrors the v0.7 ProductConfig field-validation pattern).
+const PRODUCT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+
+function assertSafeProductName(productName) {
+  if (typeof productName !== "string" || !PRODUCT_NAME_PATTERN.test(productName)) {
+    throw new TypeError(
+      `writeAmbientFence: productName must match /${PRODUCT_NAME_PATTERN.source}/ (got: ${JSON.stringify(productName)})`,
+    );
+  }
+}
+
 function escapeRegex(literal) {
   return String(literal).replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
@@ -77,11 +91,23 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   if (typeof targetPath !== "string" || !targetPath) {
     throw new TypeError("writeAmbientFence: targetPath must be a non-empty string");
   }
-  if (typeof productName !== "string" || !productName) {
-    throw new TypeError("writeAmbientFence: productName must be a non-empty string");
-  }
+  assertSafeProductName(productName);
   if (typeof contentBlock !== "string") {
     throw new TypeError("writeAmbientFence: contentBlock must be a string");
+  }
+
+  // Refuse to mutate a symlinked target — writing through a symlink (e.g.,
+  // `~/.claude/CLAUDE.md` → a sensitive file) would silently extend our
+  // ambient-context fence into whatever the symlink points at. Review finding
+  // adv-004, retroactive fixup. Use lstat to detect the symlink without
+  // following it.
+  if (fs.existsSync(targetPath)) {
+    const lstat = fs.lstatSync(targetPath);
+    if (lstat.isSymbolicLink()) {
+      throw new Error(
+        `writeAmbientFence: refusing to write through symlink at ${targetPath}; resolve the symlink or move the file before activating`,
+      );
+    }
   }
 
   const fenceBlock = composeFenceBlock(productName, contentBlock);

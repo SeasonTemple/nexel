@@ -298,6 +298,35 @@ Example:
 
 Run '${binName} help' for the complete reference.
 `,
+      activate: ({ binName }) => `${binName} activate — write ambient-context fences for installed skills
+
+Usage:
+  ${binName} activate [--target <id>] [--scope user|project] [flags]
+
+Flags:
+  --target <id>         claude | codex | opencode (comma-separate to combine).
+                        Default: claude,codex. --target=opencode is refused —
+                        OpenCode activation happens at OpenCode boot via the
+                        opencode-plugin entry, not via this verb.
+  --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
+                          project → ./CLAUDE.md + ./AGENTS.md (default)
+  --skills-dir <path>   override skills dir (default: <productConfig.defaultSkillsDir>)
+  --dry-run             report would-activate per adapter; no file writes
+  --json                machine-readable envelope on stdout
+
+Each adapter entry in the JSON envelope carries { adapter, status, code?, details }.
+Status values: activated | would-activate | refused | failed.
+
+Idempotent: re-running with no source changes produces byte-identical fence files.
+Refuses to write through symlinked target files.
+
+Examples:
+  ${binName} activate --scope=project --json
+  ${binName} activate --target=claude --dry-run
+  ${binName} activate --target=opencode    # exit 1 with ERR_ACTIVATE_OPENCODE_REFUSED
+
+Run '${binName} help' for the complete reference.
+`,
     }),
   }),
 

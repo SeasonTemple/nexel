@@ -129,6 +129,8 @@ export {
   ERR_CANCELLED,
   ERR_INVALID_PRODUCT_CONFIG,
   ERR_MISSING_PRODUCT_CONFIG,
+  ERR_ACTIVATE_OPENCODE_REFUSED,
+  ERR_ACTIVATE_INVALID_SCOPE,
 } from "./core/errors.mjs";
 
 // FsError lives in filesystem.mjs; StateError in state.mjs; CancelledError in prompts.mjs.

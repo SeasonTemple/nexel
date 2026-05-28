@@ -1,5 +1,5 @@
 ---
-name: sample:host-context
+name: sample:sample-host-context
 category: setup
 description: Demo skill exercising the unified `host-instructions:` Skill Metadata key used by `nexel activate`.
 host-instructions: references/host-context.md
