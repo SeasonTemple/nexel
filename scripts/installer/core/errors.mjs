@@ -46,6 +46,10 @@ export const ERR_HASH_CONFLICT = "ERR_HASH_CONFLICT";
 
 // Filesystem errors.
 export const ERR_LOCKED = "ERR_LOCKED";
+// ERR_TOCTOU_RACE_DETECTED — post-lock re-lstat detected the protected
+// path was swapped with a symlink, inode-replaced, or device-moved during
+// lock acquisition (ADR-0019).
+export const ERR_TOCTOU_RACE_DETECTED = "ERR_TOCTOU_RACE_DETECTED";
 export const ERR_PATH = "ERR_PATH";
 export const ERR_PATH_ESCAPE = "ERR_PATH_ESCAPE";
 export const ERR_SYMLINK = "ERR_SYMLINK";
