@@ -64,8 +64,15 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         continue
       fi
 
-      if [ "$marker_sha" != "$local_sha" ]; then
-        FAILURES="${FAILURES}\n  ${tag}: bless marker bound to ${marker_sha} but push refers to ${local_sha}. The tag was amended or rewritten since bless. Re-run npm run release:bless -- ${tag}."
+      # Peel local_sha to its underlying commit. `git push` sends the tag
+      # OBJECT SHA for annotated tags (and the commit SHA for lightweight
+      # tags); the bless marker captures the commit. Peeling unifies both
+      # cases so an annotated v0.8.3 tag pointing at commit C is recognized
+      # the same as a lightweight v0.8.3 tag pointing directly at C.
+      local_commit=$(git rev-parse --verify "${local_sha}^{commit}" 2>/dev/null || echo "$local_sha")
+
+      if [ "$marker_sha" != "$local_commit" ]; then
+        FAILURES="${FAILURES}\n  ${tag}: bless marker bound to ${marker_sha} but push refers to ${local_commit} (object ${local_sha}). The tag was amended or rewritten since bless. Re-run npm run release:bless -- ${tag}."
         continue
       fi
       ;;
