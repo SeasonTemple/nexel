@@ -32,6 +32,17 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 #   git push --no-verify origin v0.8.3
 #   HUSKY=0 git push origin v0.8.3
 #   git -c core.hooksPath=/dev/null push origin v0.8.3
+#
+# ADR-0018 CI bless path: this hook is the MAINTAINER-MACHINE transport.
+# A fresh CI runner has no `.husky/` installed (git does not invoke hooks
+# during workflow steps), and the `.nexel/release-blessed-<tag>` marker
+# is gitignored, so neither can reach CI via `actions/checkout`. The
+# server-side enforcement of the same review-gate invariant lives in
+# `.github/workflows/release.yml`'s `review-gate` job, which re-runs the
+# deterministic review checks and sets `NEXEL_CI_BLESSED=true` on the
+# `release` job's env so that `scripts/verify-release-tag.mjs` accepts
+# the tag push. The local hook and the CI job are two transports for the
+# same ADR-0013 invariant.
 
 set -e
 
