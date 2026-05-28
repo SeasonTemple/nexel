@@ -15,6 +15,9 @@ const PRODUCTION_VERBS = [
   // --target / --scope / --skills-dir / --dry-run / --json (added in the
   // round-1 review fixup; original v0.8 commit shipped without it).
   "activate",
+  // v0.9 ADR-0017: deactivate verb (adv-009) — exact-invert of activate;
+  // verb-scoped help mirrors activate's flag set minus --skills-dir.
+  "deactivate",
 ];
 
 // Sentinel that appears only in the composed full body (flagsBlock), never

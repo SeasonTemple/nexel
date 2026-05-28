@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 
 import { dispatchVerb, KERNEL_HANDLERS } from "./dispatch.mjs";
 
-test("KERNEL_HANDLERS: 12 built-in verbs", () => {
+test("KERNEL_HANDLERS: 13 built-in verbs", () => {
+  // v0.9.0 ADR-0017 adds `deactivate` (adv-009). Sequence intentionally
+  // mirrors KERNEL_HANDLERS literal-init order so a future drop or insertion
+  // surfaces here loudly.
   const expected = [
     "list", "agents", "doctor", "repair", "export", "import",
     "validate", "plan", "install", "uninstall", "update", "activate",
+    "deactivate",
   ];
   for (const v of expected) {
     assert.equal(typeof KERNEL_HANDLERS[v], "function", `missing handler: ${v}`);
