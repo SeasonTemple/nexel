@@ -24,6 +24,7 @@ import {
   runUninstall,
   runUpdate,
 } from "./run.mjs";
+import { runActivate } from "./commands/activate.mjs";
 
 const KERNEL_HANDLERS = Object.freeze({
   list: runList,
@@ -37,6 +38,7 @@ const KERNEL_HANDLERS = Object.freeze({
   install: runInstall,
   uninstall: runUninstall,
   update: runUpdate,
+  activate: runActivate,
 });
 
 /**

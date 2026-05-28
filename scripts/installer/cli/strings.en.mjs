@@ -37,6 +37,7 @@ export const strings = Object.freeze({
   repair                     Reconcile state.json against disk (default: scan only; --apply to fix)
   export                     Dump installed selection set as JSON to stdout (portable across machines)
   import                     Read selection-set JSON from stdin and install (pair with export)
+  activate                   Write ambient-context fences into CLAUDE.md / AGENTS.md for installed skills
   validate <path/SKILL.md>   Lint a single SKILL.md frontmatter without scanning the whole repo
   scaffold                   Generate three-platform plugin layout from ProductConfig
                              (only when createCli({enablePluginScaffolder: true}))

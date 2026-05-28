@@ -53,6 +53,8 @@ export function parseArgs(argv, { validVerbs } = {}) {
     noDeps: false,
     profile: null,
     lang: null,
+    scope: null,
+    skillsDir: null,
     positional: [],
   };
   for (let i = 0; i < a.length; i++) {
@@ -70,6 +72,10 @@ export function parseArgs(argv, { validVerbs } = {}) {
     if (x.startsWith("--profile=")) { out.profile = x.slice(10); continue; }
     if (x === "--lang") { out.lang = a[++i]; continue; }
     if (x.startsWith("--lang=")) { out.lang = x.slice(7); continue; }
+    if (x === "--scope") { out.scope = a[++i]; continue; }
+    if (x.startsWith("--scope=")) { out.scope = x.slice(8); continue; }
+    if (x === "--skills-dir") { out.skillsDir = a[++i]; continue; }
+    if (x.startsWith("--skills-dir=")) { out.skillsDir = x.slice(13); continue; }
     if (x === "--skill" || x === "-s") {
       while (i + 1 < a.length && !a[i + 1].startsWith("-")) out.skills.push(a[++i]);
       continue;

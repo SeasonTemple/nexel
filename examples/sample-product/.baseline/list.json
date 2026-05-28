@@ -15,6 +15,14 @@
       "description": "Minimal hello-world skill demonstrating the SKILL.md frontmatter contract.",
       "installable": true,
       "installed": false
+    },
+    {
+      "id": "sample:host-context",
+      "category": "setup",
+      "profile": "standalone",
+      "description": "Demo skill exercising the unified host-instructions Skill Metadata key consumed by nexel activate.",
+      "installable": true,
+      "installed": false
     }
   ],
   "bundles": [

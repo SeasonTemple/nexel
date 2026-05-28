@@ -69,6 +69,7 @@ test("install-skills demo: ordinary verbs are forwarded to the sample bin", () =
   const r = runDemo(["list", "--json"]);
   assert.equal(r.code, 0, r.stderr);
   const out = JSON.parse(r.stdout);
-  assert.equal(out.skills.length, 2);
+  // v0.8: sample manifest gained `sample:host-context` to exercise host-instructions:.
+  assert.equal(out.skills.length, 3);
   assert.equal(out.bundles[0].id, "sample-demo");
 });

@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 
 import { dispatchVerb, KERNEL_HANDLERS } from "./dispatch.mjs";
 
-test("KERNEL_HANDLERS: 11 built-in verbs", () => {
+test("KERNEL_HANDLERS: 12 built-in verbs", () => {
   const expected = [
     "list", "agents", "doctor", "repair", "export", "import",
-    "validate", "plan", "install", "uninstall", "update",
+    "validate", "plan", "install", "uninstall", "update", "activate",
   ];
   for (const v of expected) {
     assert.equal(typeof KERNEL_HANDLERS[v], "function", `missing handler: ${v}`);

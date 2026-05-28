@@ -1,11 +1,16 @@
 {
   "name": "sample-product",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Sample worked-example plugin demonstrating nexel's downstream layout.",
   "homepage": "https://github.com/SeasonTemple/nexel",
   "repository": "https://github.com/SeasonTemple/nexel.git",
   "license": "MIT",
-  "keywords": ["nexel", "sample", "example", "plugin"],
+  "keywords": [
+    "nexel",
+    "sample",
+    "example",
+    "plugin"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Nexel Sample Product",
@@ -13,7 +18,9 @@
     "longDescription": "The canonical worked-example product layout shipped inside the nexel repository. Demonstrates ProductConfig, the manifest format, the three-platform plugin layout, and the OpenCode plugin runtime entry. Downstream products copy this directory and rename via the documented rename procedure.",
     "developerName": "SeasonTemple",
     "category": "Developer Tools",
-    "capabilities": ["Read"],
+    "capabilities": [
+      "Read"
+    ],
     "websiteURL": "https://github.com/SeasonTemple/nexel"
   }
 }

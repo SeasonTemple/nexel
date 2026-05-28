@@ -71,6 +71,14 @@ export const ERR_CANCELLED = "ERR_CANCELLED";
 export const ERR_INVALID_PRODUCT_CONFIG = "ERR_INVALID_PRODUCT_CONFIG";
 export const ERR_MISSING_PRODUCT_CONFIG = "ERR_MISSING_PRODUCT_CONFIG";
 
+// Activate verb errors (v0.8).
+// ERR_ACTIVATE_OPENCODE_REFUSED — `--target=opencode` is intentionally refused
+// because OpenCode's plugin runtime mutates config at OpenCode boot via
+// `./adapters/opencode-plugin`; nexel-driven activate has no work to do for it.
+export const ERR_ACTIVATE_OPENCODE_REFUSED = "ERR_ACTIVATE_OPENCODE_REFUSED";
+// ERR_ACTIVATE_INVALID_SCOPE — `--scope` must be one of `user`, `project`.
+export const ERR_ACTIVATE_INVALID_SCOPE = "ERR_ACTIVATE_INVALID_SCOPE";
+
 // ---------- Error classes (new ones; existing classes stay in their owning modules) ----------
 
 /**

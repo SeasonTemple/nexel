@@ -2,9 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  HOST_INSTRUCTIONS_KEY,
   OPENCODE_INSTRUCTIONS_KEY,
+  isValidRelativeSkillPath,
+  isValidHostInstructionsPath,
   isValidOpenCodeInstructionsPath,
-  readOpenCodeInstructions as readOpenCodeInstructionsValue,
+  readHostInstructions,
 } from "../core/skill-metadata.mjs";
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---/;
@@ -15,17 +18,43 @@ function warn(logger, message) {
   }
 }
 
-export { isValidOpenCodeInstructionsPath };
+// Re-export validators so legacy callers continue to import them from this module.
+export { isValidHostInstructionsPath, isValidOpenCodeInstructionsPath };
 
+/**
+ * Discover-time per-skill reader used by `discoverOpenCodeInstructions`.
+ *
+ * Returns the declared instruction path (string) when the skill carries a
+ * valid `host-instructions:` or `opencode-instructions:` entry, or `null`
+ * when the skill declares neither (or declares an invalid value, in which
+ * case a warning is also emitted).
+ *
+ * Duplicate declarations (both keys present) are detected via the structured
+ * reader and surfaced as a single warning — `host-instructions:` always wins.
+ */
 export function readOpenCodeInstructions(frontmatterText, skillName, logger = console) {
-  const value = readOpenCodeInstructionsValue(frontmatterText);
-  if (value === null) return null;
+  const result = readHostInstructions(frontmatterText);
+  if (result === null) return null;
+  const { value, source, duplicateDetected } = result;
+
+  if (duplicateDetected) {
+    warn(
+      logger,
+      `opencode plugin: skill ${skillName} declares both ${HOST_INSTRUCTIONS_KEY} and ${OPENCODE_INSTRUCTIONS_KEY}; using ${HOST_INSTRUCTIONS_KEY}`,
+    );
+  }
+
   if (!value) {
-    warn(logger, `opencode plugin: empty ${OPENCODE_INSTRUCTIONS_KEY} in ${skillName}; skipping`);
+    const sourceKey = source === "host" ? HOST_INSTRUCTIONS_KEY : OPENCODE_INSTRUCTIONS_KEY;
+    warn(logger, `opencode plugin: empty ${sourceKey} in ${skillName}; skipping`);
     return null;
   }
-  if (!isValidOpenCodeInstructionsPath(value)) {
-    warn(logger, `opencode plugin: unsupported ${OPENCODE_INSTRUCTIONS_KEY} value in ${skillName}; use an unquoted single relative path`);
+  if (!isValidRelativeSkillPath(value)) {
+    const sourceKey = source === "host" ? HOST_INSTRUCTIONS_KEY : OPENCODE_INSTRUCTIONS_KEY;
+    warn(
+      logger,
+      `opencode plugin: unsupported ${sourceKey} value in ${skillName}; use an unquoted single relative path`,
+    );
     return null;
   }
 
@@ -53,11 +82,11 @@ export function discoverOpenCodeInstructions(skillsDir, logger = console) {
     const skillDir = path.resolve(skillsDir, entry.name);
     const instructionPath = path.resolve(skillDir, relativeInstructionPath);
     if (!instructionPath.startsWith(`${skillDir}${path.sep}`)) {
-      warn(logger, `opencode plugin: ${OPENCODE_INSTRUCTIONS_KEY} path escapes ${entry.name}; skipping`);
+      warn(logger, `opencode plugin: instruction path escapes ${entry.name}; skipping`);
       continue;
     }
     if (!fs.existsSync(instructionPath)) {
-      warn(logger, `opencode plugin: ${OPENCODE_INSTRUCTIONS_KEY} file not found for ${entry.name}: ${instructionPath}`);
+      warn(logger, `opencode plugin: instruction file not found for ${entry.name}: ${instructionPath}`);
       continue;
     }
 

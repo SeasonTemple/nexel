@@ -143,6 +143,81 @@ test("discoverOpenCodeInstructions handles an empty or missing skills directory"
   assert.deepEqual(discoverOpenCodeInstructions(path.join(os.tmpdir(), "missing-nexel-skills")), []);
 });
 
+test("discoverOpenCodeInstructions accepts host-instructions: as the unified Skill Metadata key", () => {
+  const skillsDir = makeSkillsDir();
+  try {
+    writeSkill(
+      skillsDir,
+      "host-only",
+      "name: sample:host-only\ncategory: setup\nhost-instructions: references/host.md\ndescription: host only",
+      { "references/host.md": "host body" },
+    );
+    writeSkill(
+      skillsDir,
+      "alias-only",
+      "name: sample:alias-only\ncategory: setup\nopencode-instructions: references/alias.md\ndescription: alias only",
+      { "references/alias.md": "alias body" },
+    );
+
+    const discovered = discoverOpenCodeInstructions(skillsDir).sort();
+    assert.deepEqual(discovered, [
+      path.join(skillsDir, "alias-only", "references/alias.md"),
+      path.join(skillsDir, "host-only", "references/host.md"),
+    ]);
+  } finally {
+    fs.rmSync(skillsDir, { recursive: true, force: true });
+  }
+});
+
+test("discoverOpenCodeInstructions emits a single duplicate warning and uses host-instructions when both keys are present", () => {
+  const skillsDir = makeSkillsDir();
+  const logger = makeLogger();
+  try {
+    writeSkill(
+      skillsDir,
+      "both",
+      "name: sample:both\ncategory: setup\nhost-instructions: references/host.md\nopencode-instructions: references/legacy.md\ndescription: both declared",
+      {
+        "references/host.md": "host body",
+        "references/legacy.md": "legacy body",
+      },
+    );
+
+    const discovered = discoverOpenCodeInstructions(skillsDir, logger);
+    assert.deepEqual(discovered, [
+      path.join(skillsDir, "both", "references/host.md"),
+    ]);
+    const duplicateWarnings = logger.warnings.filter((w) =>
+      w.includes("declares both") && w.includes("host-instructions") && w.includes("opencode-instructions"),
+    );
+    assert.equal(duplicateWarnings.length, 1, `expected exactly one duplicate warning, got: ${JSON.stringify(logger.warnings)}`);
+  } finally {
+    fs.rmSync(skillsDir, { recursive: true, force: true });
+  }
+});
+
+test("configureOpenCode picks up host-instructions skills end-to-end", () => {
+  const skillsDir = makeSkillsDir();
+  try {
+    writeSkill(
+      skillsDir,
+      "modern",
+      "name: sample:modern\ncategory: setup\nhost-instructions: references/host.md\ndescription: new key",
+      { "references/host.md": "modern body" },
+    );
+
+    const config = {};
+    configureOpenCode(config, skillsDir);
+
+    assert.deepEqual(config.skills.paths, [skillsDir]);
+    assert.deepEqual(config.instructions, [
+      path.join(skillsDir, "modern", "references/host.md"),
+    ]);
+  } finally {
+    fs.rmSync(skillsDir, { recursive: true, force: true });
+  }
+});
+
 test("package exports opencode plugin helper without growing main index", () => {
   const require = createRequire(import.meta.url);
   const pkg = require("../../../package.json");

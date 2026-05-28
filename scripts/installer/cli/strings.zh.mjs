@@ -22,8 +22,7 @@
 //   the call sites.
 
 export const strings = Object.freeze({
-  help: Object.freeze({
-    header: ({ binName, version }) => `${binName} v${version} — 托管安装器`,
+  help: Object.freeze({    header: ({ binName, version }) => `${binName} v${version} — 托管安装器`,
     usage: ({ binName }) => `用法:\n  ${binName} <verb> [flags]`,
 
     verbsBlock: () => `命令:
@@ -37,6 +36,7 @@ export const strings = Object.freeze({
   repair                     对齐 state.json 与磁盘(默认只扫描; --apply 修复)
   export                     将已安装选择集以 JSON 输出到 stdout
   import                     从 stdin 读取选择集 JSON 并安装(配合 export)
+  activate                   将 ambient context fence 写入 CLAUDE.md / AGENTS.md
   validate <path/SKILL.md>   lint 单个 SKILL.md frontmatter,不扫描整个 repo
   scaffold                   按 ProductConfig 生成三平台 plugin 布局
                              (仅当 createCli({enablePluginScaffolder: true}))

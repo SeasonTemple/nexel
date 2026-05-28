@@ -45,10 +45,10 @@ test("sample bin: list --json returns the sample manifest assets", () => {
   const r = runBin(["list", "--json"]);
   assert.equal(r.code, 0);
   const out = JSON.parse(r.stdout);
-  // 2 skills declared in sample.install.json
-  assert.equal(out.skills.length, 2);
+  // 3 skills declared in sample.install.json (host-context added in v0.8 to exercise host-instructions:).
+  assert.equal(out.skills.length, 3);
   const ids = out.skills.map((s) => s.id).sort();
-  assert.deepEqual(ids, ["sample:demo-bundle-skill", "sample:hello-world"]);
+  assert.deepEqual(ids, ["sample:demo-bundle-skill", "sample:hello-world", "sample:host-context"]);
   // 1 bundle declared
   assert.equal(out.bundles.length, 1);
   assert.equal(out.bundles[0].id, "sample-demo");
@@ -57,9 +57,10 @@ test("sample bin: list --json returns the sample manifest assets", () => {
 test("sample bin: list text mode shows skill flags", () => {
   const r = runBin(["list"]);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /Skills \(2\):/);
+  assert.match(r.stdout, /Skills \(3\):/);
   assert.match(r.stdout, /sample:hello-world/);
   assert.match(r.stdout, /sample:demo-bundle-skill/);
+  assert.match(r.stdout, /sample:host-context/);
   assert.match(r.stdout, /Bundles \(1\):/);
   assert.match(r.stdout, /sample-demo/);
 });
@@ -86,7 +87,7 @@ test("sample bin: --json envelope on error (no manifest)", () => {
   // from any cwd).
   assert.equal(result.status, 0, "bin should self-anchor cwd to its own dir");
   const out = JSON.parse(result.stdout);
-  assert.equal(out.skills.length, 2);
+  assert.equal(out.skills.length, 3);
 });
 
 // --- Verb-scoped help E2E (U4): the only layer that proves routing
@@ -269,3 +270,103 @@ test("sample bin scaffold: --json envelope is a single parseable line", () => {
 //   * extraHandlers / validVerbs override: createCli constructor options
 //     the thin sample bin does not exercise (it passes neither). Covered
 //     by construction at the createCli call site, not spawn-observable here.
+
+// --- nexel activate verb E2E (U6) ---
+//
+// Spawns the sample bin to exercise the full argv → dispatch → activateCommand
+// → ambient-fence chain. Each test pins `HOME` and runs `activate --scope=user`
+// against a tmp HOME, OR runs `--scope=project` from a tmp cwd, so no real
+// user dotfiles are touched.
+
+function spawnActivate(args, { tmpHome, tmpCwd } = {}) {
+  const env = { ...process.env, FORCE_COLOR: "0" };
+  if (tmpHome) env.HOME = tmpHome;
+  return spawnSync("node", [BIN, "activate", ...args], {
+    encoding: "utf8",
+    cwd: tmpCwd ?? HERE,
+    env,
+  });
+}
+
+test("sample bin activate: refuses --target=opencode with ERR_ACTIVATE_OPENCODE_REFUSED", () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "activate-home-"));
+  try {
+    const r = spawnActivate(["--target", "opencode", "--scope", "user", "--json"], { tmpHome });
+    assert.notEqual(r.status, 0, "opencode refusal must be non-zero exit");
+    const parsed = JSON.parse(r.stdout);
+    const opencodeEntry = parsed.adapters.find((a) => a.adapter === "opencode");
+    assert.equal(opencodeEntry.status, "refused");
+    assert.equal(opencodeEntry.code, "ERR_ACTIVATE_OPENCODE_REFUSED");
+    assert.ok(opencodeEntry.details.reason.includes("opencode-plugin"));
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test("sample bin activate: --scope=user writes fences under tmp HOME", () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "activate-home-"));
+  try {
+    const r = spawnActivate(["--scope", "user", "--json"], { tmpHome });
+    assert.equal(r.status, 0, r.stderr);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.ok, true);
+    const claudeEntry = parsed.adapters.find((a) => a.adapter === "claude");
+    const codexEntry = parsed.adapters.find((a) => a.adapter === "codex");
+    assert.equal(claudeEntry.status, "activated");
+    assert.equal(codexEntry.status, "activated");
+    assert.equal(claudeEntry.details.targetPath, path.join(tmpHome, ".claude", "CLAUDE.md"));
+    assert.equal(codexEntry.details.targetPath, path.join(tmpHome, ".codex", "AGENTS.md"));
+    assert.ok(fs.existsSync(path.join(tmpHome, ".claude", "CLAUDE.md")));
+    assert.ok(fs.existsSync(path.join(tmpHome, ".codex", "AGENTS.md")));
+    // Both fences mention the sample-host-context skill (exercises the unified host-instructions key end-to-end).
+    const claudeBody = fs.readFileSync(path.join(tmpHome, ".claude", "CLAUDE.md"), "utf8");
+    assert.ok(claudeBody.includes("<!-- nexel:sample-product:begin -->"));
+    assert.ok(claudeBody.includes("sample-host-context"));
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test("sample bin activate: --dry-run --json reports would-activate without writes", () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "activate-dry-"));
+  try {
+    const r = spawnActivate(["--scope", "user", "--dry-run", "--json"], { tmpHome });
+    assert.equal(r.status, 0, r.stderr);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.dryRun, true);
+    for (const entry of parsed.adapters) {
+      assert.equal(entry.status, "would-activate");
+      assert.ok(entry.details.discoveredCount >= 1, "discovers at least the sample-host-context skill");
+    }
+    assert.equal(fs.existsSync(path.join(tmpHome, ".claude", "CLAUDE.md")), false);
+    assert.equal(fs.existsSync(path.join(tmpHome, ".codex", "AGENTS.md")), false);
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test("sample bin activate: idempotent re-run is changed:false per adapter", () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "activate-idem-"));
+  try {
+    spawnActivate(["--scope", "user"], { tmpHome });
+    const r = spawnActivate(["--scope", "user", "--json"], { tmpHome });
+    assert.equal(r.status, 0, r.stderr);
+    const parsed = JSON.parse(r.stdout);
+    for (const entry of parsed.adapters.filter((a) => a.adapter !== "opencode")) {
+      assert.equal(entry.status, "activated");
+      assert.equal(entry.details.changed, false, `${entry.adapter} should be idempotent on re-run`);
+    }
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test("sample bin activate: rejects unknown --scope with ERR_ACTIVATE_INVALID_SCOPE", () => {
+  const r = spawnActivate(["--scope", "bogus", "--json"]);
+  assert.notEqual(r.status, 0);
+  const stderr = r.stderr;
+  assert.ok(
+    stderr.includes("ERR_ACTIVATE_INVALID_SCOPE") || r.stdout.includes("ERR_ACTIVATE_INVALID_SCOPE"),
+    `expected ERR_ACTIVATE_INVALID_SCOPE in output, got stderr=${stderr} stdout=${r.stdout}`,
+  );
+});

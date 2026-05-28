@@ -21,6 +21,14 @@
         "agents": ["example-agent"],
         "rules": ["rules/sample-rule.md"]
       }
+    },
+    "sample:host-context": {
+      "id": "sample:host-context",
+      "dirname": "sample-host-context",
+      "sourcePath": "skills/sample-host-context",
+      "category": "setup",
+      "profile": "standalone",
+      "description": "Demo skill exercising the unified host-instructions Skill Metadata key consumed by nexel activate."
     }
   },
   "agents": {

@@ -10,7 +10,8 @@ import { loadManifest } from "../../scripts/installer/core/manifest/loader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.join(HERE, "skills");
-const INSTRUCTIONS = path.join(SKILLS_DIR, "hello-world", "references", "opencode-instructions.md");
+const LEGACY_INSTRUCTIONS = path.join(SKILLS_DIR, "hello-world", "references", "opencode-instructions.md");
+const HOST_INSTRUCTIONS = path.join(SKILLS_DIR, "sample-host-context", "references", "host-context.md");
 
 test("sample OpenCode plugin configures skills path and instructions idempotently", async () => {
   const plugin = await SampleProductPlugin({});
@@ -20,7 +21,10 @@ test("sample OpenCode plugin configures skills path and instructions idempotentl
   await plugin.config(config);
 
   assert.deepEqual(config.skills.paths, [SKILLS_DIR]);
-  assert.deepEqual(config.instructions, [INSTRUCTIONS]);
+  // v0.8: discover picks up BOTH hello-world (opencode-instructions: alias) and
+  // sample-host-context (host-instructions: unified key). The unified key + alias
+  // mechanism (R2, AE5) is exercised end-to-end through the OpenCode plugin entry.
+  assert.deepEqual(config.instructions.sort(), [HOST_INSTRUCTIONS, LEGACY_INSTRUCTIONS].sort());
 });
 
 test("sample OpenCode instruction file remains a skill file, not a separate manifest asset", () => {
@@ -34,5 +38,5 @@ test("sample OpenCode instruction file remains a skill file, not a separate mani
 
   assert.ok(plan.files.some((file) => file.sourcePath === "skills/hello-world/references/opencode-instructions.md"));
   assert.ok(plan.files.every((file) => file.assetType === "skill"));
-  assert.equal(fs.existsSync(INSTRUCTIONS), true);
+  assert.equal(fs.existsSync(LEGACY_INSTRUCTIONS), true);
 });
