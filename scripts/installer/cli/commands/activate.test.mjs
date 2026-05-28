@@ -85,6 +85,8 @@ test("activateCommand activates claude + codex with default targets (no --target
     for (const entry of result.adapters) {
       assert.equal(entry.status, "activated");
       assert.equal(entry.details.action, "created");
+      // T-05 fixup: live-run envelope must carry per-skill discovered names.
+      assert.deepEqual(entry.details.discovered, ["alpha"]);
     }
     assert.ok(fs.existsSync(path.join(cwdDir, "CLAUDE.md")));
     assert.ok(fs.existsSync(path.join(cwdDir, "AGENTS.md")));

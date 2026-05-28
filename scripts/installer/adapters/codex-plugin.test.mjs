@@ -105,6 +105,22 @@ test("activateCodex is byte-stable on identical re-run", () => {
   }
 });
 
+test("discoverCodexInstructions returns entries in codepoint-sorted order (T-03 fixup)", () => {
+  const skillsDir = makeSkillsDir();
+  try {
+    // Write skills out of alphabetical order so any readdir-natural ordering
+    // would surface as a test failure on this assertion.
+    writeSkill(skillsDir, "zebra",  "name: sample:zebra\nhost-instructions: r/z.md\ndescription: z", { "r/z.md": "z" });
+    writeSkill(skillsDir, "alpha",  "name: sample:alpha\nhost-instructions: r/a.md\ndescription: a", { "r/a.md": "a" });
+    writeSkill(skillsDir, "middle", "name: sample:middle\nhost-instructions: r/m.md\ndescription: m", { "r/m.md": "m" });
+
+    const order = discoverCodexInstructions(skillsDir).map((d) => d.skillName);
+    assert.deepEqual(order, ["alpha", "middle", "zebra"]);
+  } finally {
+    fs.rmSync(skillsDir, { recursive: true, force: true });
+  }
+});
+
 test("three-way round-trip: host-instructions skill discovered by claude, codex, AND opencode helpers (R22)", () => {
   const skillsDir = makeSkillsDir();
   try {

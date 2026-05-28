@@ -51,13 +51,15 @@ export function discoverCodexInstructions(skillsDir, logger = console) {
   if (!fs.existsSync(skillsDir)) return [];
 
   const out = [];
-  // P2-A: sort entries by name so fence body order is deterministic across
-  // filesystems (some return readdir in inode/insertion order rather than
-  // alphabetical). Required for the byte-stable idempotency contract.
+  // Sort entries by codepoint so fence body order is deterministic across
+  // filesystems AND locales. v0.8.1 used `localeCompare` which leaks the
+  // host's collation (e.g., tr_TR orders `İ` differently from en_US),
+  // breaking the byte-stable idempotency contract across CI runners with
+  // different `LANG`. v0.8.2 uses a codepoint comparator instead.
   const entries = fs
     .readdirSync(skillsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
   for (const entry of entries) {
     const frontmatter = readSkillFrontmatter(skillsDir, entry);

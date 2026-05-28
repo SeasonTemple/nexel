@@ -100,6 +100,22 @@ test("discoverClaudeInstructions emits a single duplicate warning when both keys
   }
 });
 
+test("discoverClaudeInstructions returns entries in codepoint-sorted order (T-03 fixup, parallel to codex)", () => {
+  const skillsDir = makeSkillsDir();
+  try {
+    // Mirror codex-plugin's T-03 test. Write skills out of alphabetical order
+    // so a regression to localeCompare on a non-en runner would surface here.
+    writeSkill(skillsDir, "zebra",  "name: sample:zebra\nhost-instructions: r/z.md\ndescription: z", { "r/z.md": "z" });
+    writeSkill(skillsDir, "alpha",  "name: sample:alpha\nhost-instructions: r/a.md\ndescription: a", { "r/a.md": "a" });
+    writeSkill(skillsDir, "middle", "name: sample:middle\nhost-instructions: r/m.md\ndescription: m", { "r/m.md": "m" });
+
+    const order = discoverClaudeInstructions(skillsDir).map((d) => d.skillName);
+    assert.deepEqual(order, ["alpha", "middle", "zebra"]);
+  } finally {
+    fs.rmSync(skillsDir, { recursive: true, force: true });
+  }
+});
+
 test("discoverClaudeInstructions skips invalid values with warnings", () => {
   const skillsDir = makeSkillsDir();
   const logger = makeLogger();

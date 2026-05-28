@@ -119,6 +119,7 @@ Downstream products can fork the linter (`scripts/lint-skills.mjs`) if they want
   provenance. Do not make signing a hard local hook requirement until the
   maintainer machines and automation path all have signing keys configured.
 - Release automation lives in GitHub Actions. For normal releases, follow `docs/release-workflow.md`: update version + release note, push `main`, then push the `vX.Y.Z` tag. Do not manually create GitHub Release assets unless repairing a failed release.
+- **Mandatory release-time review gate.** Before pushing a `vX.Y.Z` tag, run a multi-agent code review pass (`compound-engineering:ce-code-review`) on the diff from the previous tag. This is a mechanical scaffold — three consecutive releases (v0.7.0, v0.8.0, v0.8.1) shipped without prior review and each required a round-1 fixup commit, including two live-verified exploits. P1 findings MUST be fixed or explicitly documented in release notes before tagging. The gate applies even when `npm test` is fully green; the test suite catches regressions of asserted behavior, code review catches the un-asserted classes (idempotency claims that leak locale, sentinel checks that pass substring matches, etc.).
 - Release notes must provide both `## English` and `## 中文` sections. The
   release preflight and tag validation scripts enforce this for the current
   package version.

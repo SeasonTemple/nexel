@@ -76,12 +76,25 @@ function composeFenceBlock(productName, contentBlock) {
 
 // Verify that an existing fence for `productName` in `fileText` was written
 // by `writeAmbientFence` rather than being user prose that contains
-// marker-shaped text. Trusted iff the managed-header sentinel appears between
-// the markers. Round-2 P1#6 defense against adv-001 prose-marker collision.
+// marker-shaped text. Trusted iff the managed-header sentinel appears as
+// the FIRST line of the fence body (immediately after the begin marker).
+//
+// v0.8.1 shipped a substring (.includes) check which is bypassable: user
+// prose containing the sentinel literal anywhere in the body would pass
+// trust verification. v0.8.2 hardens to a positional check — the sentinel
+// must occupy line 1 of the body. composeFenceBlock always emits it there.
 function isFenceTrusted(fileText, productName) {
   const m = fileText.match(fenceRegex(productName));
   if (!m) return true; // No existing fence — nothing to overwrite, trivially safe.
-  return m[0].includes(MANAGED_HEADER);
+  const block = m[0];
+  // Expected shape inside the matched block:
+  //   <begin-marker>\n<MANAGED_HEADER>\n...body...\n<end-marker>
+  // Slice from the first newline after the begin marker; the sentinel must
+  // be the immediate next line.
+  const firstNewline = block.indexOf("\n");
+  if (firstNewline < 0) return false;
+  const afterBegin = block.slice(firstNewline + 1);
+  return afterBegin.startsWith(`${MANAGED_HEADER}\n`);
 }
 
 /**
@@ -158,6 +171,19 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
     fs.writeFileSync(targetPath, after);
     if (logger?.info) logger.info(`ambient-fence: updated fence for ${productName} in ${targetPath}`);
     return { action: "updated", changed: true, targetPath };
+  }
+
+  // Orphan-marker check (adv-006 v0.8.2 defense). The fence regex requires a
+  // matched BEGIN/END pair. If we reach this branch the regex failed, but the
+  // file may still contain an unpaired BEGIN marker for this product (user
+  // prose copied from documentation, or a previous fence whose END marker was
+  // hand-deleted). Appending a new fence under that orphan would silently
+  // engulf the prose between the orphan BEGIN and our new END on the next
+  // update round. Refuse instead.
+  if (before.includes(beginMarker(productName)) || before.includes(endMarker(productName))) {
+    throw new Error(
+      `writeAmbientFence: orphan fence marker for "${productName}" in ${targetPath} (BEGIN without matching END, or END without matching BEGIN) — refusing to append; would engulf any prose between the orphan and the new fence on subsequent updates. Inspect and remove the orphan markers manually before re-running.`,
+    );
   }
 
   // Append fence to end of file, ensuring exactly one blank line of

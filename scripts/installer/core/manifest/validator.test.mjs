@@ -108,3 +108,36 @@ test("validateManifest: opencode-instructions missing file fails when repoRoot i
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
 });
+
+test("validateManifest: host-instructions missing file error message cites host-instructions key (T-06 v0.8.2 fixup)", () => {
+  const { repoRoot, manifest } = makeRepoWithSkill(
+    "name: sample:ambient-review\ncategory: review\nhost-instructions: references/missing.md\ndescription: test"
+  );
+  try {
+    const findings = validateManifest(manifest, {
+      repoRoot,
+      skillsDirAbs: path.join(repoRoot, "skills"),
+      skillIdPrefix: "sample",
+    });
+    assert.ok(
+      findings.some((f) => /host-instructions file does not exist/.test(f.message)),
+      `expected message to cite host-instructions, got: ${JSON.stringify(findings)}`,
+    );
+    // And NOT mis-cite opencode-instructions when the violation is on host-instructions.
+    assert.ok(
+      !findings.some((f) => /opencode-instructions file does not exist/.test(f.message)),
+      `host-instructions violation should not mention opencode-instructions: ${JSON.stringify(findings)}`,
+    );
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+// Note: validator.mjs has a path-escape branch (startsWith(skillDir + sep)
+// check) but isValidRelativeSkillPath in skill-metadata.mjs filters values
+// containing `..` segments BEFORE the branch runs, making the branch
+// functionally unreachable from any frontmatter value the predicate accepts.
+// A test attempting to exercise that branch would be a false-positive
+// assertion; we therefore cover only the reachable branch (missing-file)
+// above and document this as a known unreachable code path. Eliminating
+// the branch is a v0.8.x+ cleanup candidate.

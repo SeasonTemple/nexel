@@ -236,6 +236,56 @@ test("productName validation rejects unsafe values (adv-005 fixup)", () => {
   }
 });
 
+test("refuses append path when target file contains an orphan begin marker (adv-006 v0.8.2)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // User prose copies the documented marker syntax but neglects to add the
+    // end marker (or the end marker was hand-deleted). Without the v0.8.2
+    // defense, writeAmbientFence would append below the orphan and the next
+    // update would lazy-match across the orphan + the just-appended end.
+    fs.writeFileSync(
+      target,
+      `## My notes\n\n<!-- nexel:acme:begin -->\nthings I want to keep\n\n(no end marker)\n`,
+    );
+    assert.throws(
+      () => writeAmbientFence({ targetPath: target, productName: "acme", contentBlock: "kernel body" }),
+      /orphan fence marker/i,
+    );
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("things I want to keep"));
+    assert.ok(!after.includes("kernel body"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("refuses fence whose body contains the sentinel literal but NOT on line 1 (v0.8.2 line-anchor)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Attack class corrected in v0.8.2: prior .includes() check would TRUST
+    // any block containing the sentinel anywhere. Now the sentinel must occupy
+    // line 1 of the body. This block has the sentinel as line 3, not line 1
+    // — must refuse.
+    fs.writeFileSync(
+      target,
+      `<!-- nexel:acme:begin -->\nuser line one\nuser line two\n${MANAGED_HEADER}\nthings I copied from docs\n<!-- nexel:acme:end -->\n`,
+    );
+    assert.throws(
+      () => writeAmbientFence({ targetPath: target, productName: "acme", contentBlock: "kernel body" }),
+      /managed-header sentinel/i,
+    );
+    // User content preserved byte-identically.
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("user line one"));
+    assert.ok(after.includes("things I copied from docs"));
+    assert.ok(!after.includes("kernel body"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("refuses to overwrite a marker pair lacking the managed-header sentinel (P1#6 adv-001 fixup)", () => {
   const dir = makeTempDir();
   try {

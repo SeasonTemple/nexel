@@ -310,10 +310,16 @@ test("sample bin activate: --scope=user writes fences under tmp HOME", () => {
     assert.equal(r.status, 0, r.stderr);
     const parsed = JSON.parse(r.stdout);
     assert.equal(parsed.ok, true);
+    // T-04 fixup: envelope must carry a warnings array even when empty so
+    // agents can rely on the field being present.
+    assert.ok(Array.isArray(parsed.warnings), "warnings field must exist on activate --json envelope");
     const claudeEntry = parsed.adapters.find((a) => a.adapter === "claude");
     const codexEntry = parsed.adapters.find((a) => a.adapter === "codex");
     assert.equal(claudeEntry.status, "activated");
     assert.equal(codexEntry.status, "activated");
+    // T-05 fixup: live-run entries carry discovered skill names.
+    assert.ok(Array.isArray(claudeEntry.details.discovered));
+    assert.ok(claudeEntry.details.discovered.includes("sample-host-context"));
     assert.equal(claudeEntry.details.targetPath, path.join(tmpHome, ".claude", "CLAUDE.md"));
     assert.equal(codexEntry.details.targetPath, path.join(tmpHome, ".codex", "AGENTS.md"));
     assert.ok(fs.existsSync(path.join(tmpHome, ".claude", "CLAUDE.md")));

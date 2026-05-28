@@ -37,7 +37,17 @@ assets manually from a local checkout except as an emergency repair.
    npm run package:smoke
    ```
 
-4. Push `main`, then push the tag:
+4. **Mandatory pre-tag code review** (per CLAUDE.md "Mandatory release-time
+   review gate"). Run `compound-engineering:ce-code-review` against the diff
+   from the previous tag. Fix or document every P1 finding in the release
+   notes before proceeding. This step exists because three releases
+   (v0.7.0, v0.8.0, v0.8.1) shipped without prior review and each required
+   a round-1 fixup commit, including two live-verified exploits. `npm test`
+   green is necessary but not sufficient — it catches regressions of
+   asserted behavior, not un-asserted-yet contract claims (idempotency
+   locale drift, sentinel substring bypass, etc.).
+
+5. Push `main`, then push the tag:
 
    ```sh
    git add package.json package-lock.json docs/release-notes/vX.Y.Z.md
@@ -47,7 +57,7 @@ assets manually from a local checkout except as an emergency repair.
    git push origin vX.Y.Z
    ```
 
-5. GitHub Actions creates the release and uploads:
+6. GitHub Actions creates the release and uploads:
 
    ```text
    nexel-X.Y.Z.tgz

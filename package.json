@@ -1,6 +1,6 @@
 {
   "name": "nexel",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "type": "module",
   "description": "Kernel library for managing agent skills, agents, and rules across Claude Code, Codex, and OpenCode — product-agnostic installer driven by a per-product ProductConfig.",
