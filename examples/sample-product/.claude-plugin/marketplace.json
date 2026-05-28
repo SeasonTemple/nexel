@@ -9,7 +9,7 @@
     {
       "name": "sample-product",
       "description": "Sample worked-example plugin demonstrating nexel's downstream layout.",
-      "version": "0.8.5",
+      "version": "0.9.0",
       "source": "."
     }
   ]
