@@ -276,13 +276,23 @@ export async function runActivate(args, ctx) {
       }, null, 2) + "\n");
       return;
     }
+    // activateCommand always emits a `refused` or `failed` adapter entry
+    // whenever it flips ok:false, so firstFailure is non-undefined here by
+    // construction (validated by activate.test.mjs unit suite). The
+    // ERR_ACTIVATE_FAILED defensive fallback removed in v0.8.5 — dead code
+    // per the round-6 cleanup. The assert below pins the contract so a
+    // future contributor adding a new ok:false trigger without pushing an
+    // entry fails loudly rather than via TypeError + ERR_UNKNOWN.
     const firstFailure = envelope.adapters.find((a) => a.status === "refused" || a.status === "failed");
-    const errorCode = firstFailure?.code ?? "ERR_ACTIVATE_FAILED";
-    const message = firstFailure?.status === "refused"
+    if (!firstFailure) {
+      throw new Error(
+        "activate contract violation: activateCommand returned ok:false with no refused/failed adapter entry; add the missing entry push in activateCommand or restore the ERR_ACTIVATE_FAILED fallback removed in v0.8.5.",
+      );
+    }
+    const errorCode = firstFailure.code;
+    const message = firstFailure.status === "refused"
       ? `activate: ${firstFailure.adapter} refused — ${firstFailure.details?.reason ?? "see details"}`
-      : firstFailure?.details?.message
-        ? `activate: ${firstFailure.adapter} failed — ${firstFailure.details.message}`
-        : "activate: one or more adapters did not complete cleanly";
+      : `activate: ${firstFailure.adapter} failed — ${firstFailure.details?.message ?? "see details"}`;
     process.stdout.write(JSON.stringify({
       ok: false,
       error: errorCode,

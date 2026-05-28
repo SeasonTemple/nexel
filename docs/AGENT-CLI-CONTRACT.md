@@ -115,10 +115,11 @@ error envelope shape with per-adapter detail under `details.adapters`:
 }
 ```
 
-The `error` code comes from the first refused/failed adapter entry; when
-no specific code applies, `ERR_ACTIVATE_FAILED` is used. This unification
-applies to thrown precondition errors too (invalid `--scope`, missing
-`productConfig`, unknown `--target`) — they always followed §3 and
+The `error` code comes from the first refused/failed adapter entry —
+`activate` always emits such an entry when the run is ok:false, so the
+field is always populated with a specific code. This unification applies
+to thrown precondition errors too (invalid `--scope`, missing
+`productConfig`, unknown `--agent`) — they always followed §3 and
 continue to do so.
 
 Fences are idempotent: re-running with no source changes produces

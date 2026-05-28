@@ -375,6 +375,37 @@ test("trusts and updates a fence that carries the managed-header sentinel", () =
   }
 });
 
+test("refuses to lock through a symlinked .lock path (adv-r5-C v0.8.5 DOS defense)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    const lockPath = `${target}.lock`;
+    // Plant a symlink at the lock path — without the v0.8.5 defense, this
+    // would permanently block every subsequent activate with ELOCKED
+    // because proper-lockfile's stale cleanup doesn't fire on symlinks.
+    const decoyTarget = path.join(dir, "decoy");
+    fs.writeFileSync(decoyTarget, "irrelevant");
+    try {
+      fs.symlinkSync(decoyTarget, lockPath);
+    } catch (e) {
+      if (e.code === "EPERM" || e.code === "EACCES") return; // Windows w/o privilege
+      throw e;
+    }
+    assert.throws(
+      () => writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "body" }),
+      // Pin the v0.8.5 guard's distinctive wording. proper-lockfile's own
+      // ELOCKED would also match /symlink/i loosely — anchor on the
+      // "planted DOS or stale state" framing to prove this test exercises
+      // the v0.8.5 lstat-before-lock check, not just any symlink rejection.
+      /planted DOS or stale state/i,
+    );
+    // Target file untouched.
+    assert.equal(fs.existsSync(target), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("refuses to write through a symlinked target (adv-004 fixup)", () => {
   const dir = makeTempDir();
   try {

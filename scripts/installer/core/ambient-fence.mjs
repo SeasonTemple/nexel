@@ -153,6 +153,21 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   // targetPath to be present.
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
 
+  // v0.8.5 adv-r5-C symlink-at-lock DOS defense. If `<target>.lock` is a
+  // symlink (typically a planted attack: ln -s /etc/hosts <target>.lock),
+  // proper-lockfile's stale-cleanup never fires against it and every
+  // subsequent activate is permanently blocked with ELOCKED. Mirror the
+  // v0.8.3 symlink-at-target defense at the lock path before locking.
+  const lockPath = `${targetPath}.lock`;
+  if (fs.existsSync(lockPath)) {
+    const lockLstat = fs.lstatSync(lockPath);
+    if (lockLstat.isSymbolicLink()) {
+      throw new Error(
+        `writeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
+      );
+    }
+  }
+
   // v0.8.4 #1 (adv-003) race defense: serialize concurrent activates
   // against the same target file. proper-lockfile (already a kernel dep,
   // used by core/filesystem.mjs for state.json locking) is the same lock
