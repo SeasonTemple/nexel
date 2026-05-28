@@ -17,7 +17,12 @@ import {
   FRONTMATTER_RE,
 } from "./schema.mjs";
 import { loadManifest, defaultPaths, stripBom } from "./loader.mjs";
-import { isValidOpenCodeInstructionsPath, readOpenCodeInstructions } from "../skill-metadata.mjs";
+import {
+  isValidRelativeSkillPath,
+  readHostInstructions,
+  HOST_INSTRUCTIONS_KEY,
+  OPENCODE_INSTRUCTIONS_KEY,
+} from "../skill-metadata.mjs";
 
 function isInsideRepo(repoRoot, candidate) {
   if (typeof candidate !== "string" || candidate.length === 0) return false;
@@ -205,18 +210,24 @@ function validateSkillFrontmatterMatch(skill, skillMdPath, findings) {
 }
 
 function validateOpenCodeInstructionsFile(skill, skillMdPath, frontmatterText, findings) {
-  const relativeInstructionPath = readOpenCodeInstructions(frontmatterText);
-  if (relativeInstructionPath === null) return;
-  if (!isValidOpenCodeInstructionsPath(relativeInstructionPath)) return;
+  const result = readHostInstructions(frontmatterText);
+  if (result === null) return;
+  if (!isValidRelativeSkillPath(result.value)) return;
+
+  // P2-F: cite the actual frontmatter key that supplied the value so the user
+  // can grep their SKILL.md. `host-instructions:` is the unified key (v0.8);
+  // `opencode-instructions:` is the legacy alias retained for back-compat.
+  const sourceKey = result.source === "host" ? HOST_INSTRUCTIONS_KEY : OPENCODE_INSTRUCTIONS_KEY;
+  const relativeInstructionPath = result.value;
 
   const skillDir = path.dirname(skillMdPath);
   const instructionPath = path.resolve(skillDir, relativeInstructionPath);
   if (!instructionPath.startsWith(`${skillDir}${path.sep}`)) {
-    pushError(findings, "skills", skill.id, `opencode-instructions path escapes skill directory: ${relativeInstructionPath}`);
+    pushError(findings, "skills", skill.id, `${sourceKey} path escapes skill directory: ${relativeInstructionPath}`);
     return;
   }
   if (!fs.existsSync(instructionPath)) {
-    pushError(findings, "skills", skill.id, `opencode-instructions file does not exist: ${path.posix.join(skill.sourcePath, relativeInstructionPath)}`);
+    pushError(findings, "skills", skill.id, `${sourceKey} file does not exist: ${path.posix.join(skill.sourcePath, relativeInstructionPath)}`);
   }
 }
 

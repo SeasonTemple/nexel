@@ -25,6 +25,13 @@ const BEGIN_SUFFIX = ":begin -->";
 const END_PREFIX = "<!-- nexel:";
 const END_SUFFIX = ":end -->";
 
+// Sentinel line written as the first line of every managed fence body. Its
+// presence is verified before an existing fence is replaced — if the sentinel
+// is missing, the fence is treated as user prose that happens to contain
+// marker-shaped text and `writeAmbientFence` refuses to overwrite it. Defends
+// against the adv-001 user-prose collision (round-2 P1#6 fixup).
+const MANAGED_HEADER = "<!-- nexel-managed-fence v1; do not edit between markers -->";
+
 // productName must be a single identifier-shaped token. Embedding newlines,
 // whitespace, or shell-control chars in the fence marker `<!-- nexel:<name>:begin -->`
 // would produce malformed HTML comment markers (review finding adv-005,
@@ -63,7 +70,18 @@ function fenceRegex(productName) {
 
 function composeFenceBlock(productName, contentBlock) {
   const trimmed = String(contentBlock ?? "").replace(/^\n+/, "").replace(/\n+$/, "");
-  return `${beginMarker(productName)}\n${trimmed}\n${endMarker(productName)}`;
+  // MANAGED_HEADER is the first line of every fence body. Round-2 P1#6 defense.
+  return `${beginMarker(productName)}\n${MANAGED_HEADER}\n${trimmed}\n${endMarker(productName)}`;
+}
+
+// Verify that an existing fence for `productName` in `fileText` was written
+// by `writeAmbientFence` rather than being user prose that contains
+// marker-shaped text. Trusted iff the managed-header sentinel appears between
+// the markers. Round-2 P1#6 defense against adv-001 prose-marker collision.
+function isFenceTrusted(fileText, productName) {
+  const m = fileText.match(fenceRegex(productName));
+  if (!m) return true; // No existing fence — nothing to overwrite, trivially safe.
+  return m[0].includes(MANAGED_HEADER);
 }
 
 /**
@@ -123,6 +141,15 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   const re = fenceRegex(productName);
 
   if (re.test(before)) {
+    // P1#6 defense: refuse to overwrite a marker pair that lacks the
+    // managed-header sentinel. The markers may be user prose copied from
+    // documentation rather than a real prior `writeAmbientFence` output.
+    if (!isFenceTrusted(before, productName)) {
+      throw new Error(
+        `writeAmbientFence: existing fence markers for "${productName}" in ${targetPath} lack the managed-header sentinel — refusing to overwrite what may be user prose. ` +
+        `Inspect the file, remove the conflicting <!-- nexel:${productName}:begin/end --> markers manually, and re-run.`,
+      );
+    }
     const after = before.replace(re, fenceBlock);
     if (after === before) {
       if (logger?.info) logger.info(`ambient-fence: ${targetPath} unchanged (byte-identical)`);

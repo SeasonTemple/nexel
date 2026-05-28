@@ -10,7 +10,18 @@ function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "nexel-ambient-fence-"));
 }
 
+const MANAGED_HEADER = "<!-- nexel-managed-fence v1; do not edit between markers -->";
+
 function fenceFor(name, body) {
+  // Mirrors writeAmbientFence's composeFenceBlock — every managed fence carries
+  // the MANAGED_HEADER as line 1 of the body (P1#6 prose-collision defense).
+  return `<!-- nexel:${name}:begin -->\n${MANAGED_HEADER}\n${body}\n<!-- nexel:${name}:end -->`;
+}
+
+function rawFenceFor(name, body) {
+  // Legacy v0.8.0-shape fence WITHOUT the managed-header sentinel. Used to
+  // exercise the round-2 P1#6 refusal path — these are indistinguishable from
+  // user-prose markers as far as the writer is concerned.
   return `<!-- nexel:${name}:begin -->\n${body}\n<!-- nexel:${name}:end -->`;
 }
 
@@ -220,6 +231,46 @@ test("productName validation rejects unsafe values (adv-005 fixup)", () => {
         `productName ${JSON.stringify(productName)} should be rejected`,
       );
     }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("refuses to overwrite a marker pair lacking the managed-header sentinel (P1#6 adv-001 fixup)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Simulate user prose containing literal marker text with NO managed header.
+    fs.writeFileSync(
+      target,
+      `## My notes\n\n${rawFenceFor("acme", "things I want to keep")}\n\nmore prose\n`,
+    );
+
+    assert.throws(
+      () => writeAmbientFence({ targetPath: target, productName: "acme", contentBlock: "kernel body" }),
+      /managed-header sentinel/i,
+    );
+    // User content untouched.
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("things I want to keep"), "user prose preserved");
+    assert.ok(!after.includes("kernel body"), "kernel content NOT written");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("trusts and updates a fence that carries the managed-header sentinel", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Bootstrap with a real writeAmbientFence call so the managed header is present.
+    writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "old body" });
+    const result = writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "new body" });
+    assert.equal(result.action, "updated");
+    assert.equal(result.changed, true);
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("new body"));
+    assert.ok(after.includes(MANAGED_HEADER), "managed header preserved on update");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

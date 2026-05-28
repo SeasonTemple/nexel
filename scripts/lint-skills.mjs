@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 import { isValidOpenCodeInstructionsPath, readOpenCodeInstructions } from "./installer/core/skill-metadata.mjs";
-
-const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---/;
+import { FRONTMATTER_RE } from "./installer/core/manifest/schema.mjs";
 const CATEGORIES = new Set(["principle", "best-practice", "test", "review", "tool", "setup"]);
 export const VALID_CATEGORIES = Object.freeze([...CATEGORIES]);
 

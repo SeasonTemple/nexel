@@ -7,6 +7,7 @@ import {
   isValidRelativeSkillPath,
   readHostInstructions,
 } from "../core/skill-metadata.mjs";
+import { FRONTMATTER_RE } from "../core/manifest/schema.mjs";
 import { writeAmbientFence } from "../core/ambient-fence.mjs";
 
 // Plugin Runtime helper for Codex.
@@ -18,8 +19,6 @@ import { writeAmbientFence } from "../core/ambient-fence.mjs";
 //
 // Exported via `./adapters/codex-plugin` subpath; NOT re-exported from
 // `scripts/installer/index.mjs` (per ADR-0009 D2).
-
-const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---/;
 
 function warn(logger, message) {
   if (logger && typeof logger.warn === "function") {
@@ -52,9 +51,13 @@ export function discoverCodexInstructions(skillsDir, logger = console) {
   if (!fs.existsSync(skillsDir)) return [];
 
   const out = [];
+  // P2-A: sort entries by name so fence body order is deterministic across
+  // filesystems (some return readdir in inode/insertion order rather than
+  // alphabetical). Required for the byte-stable idempotency contract.
   const entries = fs
     .readdirSync(skillsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory());
+    .filter((entry) => entry.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const entry of entries) {
     const frontmatter = readSkillFrontmatter(skillsDir, entry);

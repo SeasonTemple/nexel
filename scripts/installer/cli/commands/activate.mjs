@@ -97,6 +97,10 @@ function activatedEntry(adapter, fenceResult) {
       changed,
       targetPath,
       discoveredCount: discovered.length,
+      // P2-C: include per-skill names so live runs are as informative as
+      // dry-run envelopes. Agents driving activation no longer need a
+      // follow-up probe to learn which skills landed in the fence.
+      discovered: discovered.map((d) => d.skillName),
     },
   };
 }
@@ -198,6 +202,19 @@ export function activateCommand({ repoRoot, productConfig, scope, targets, skill
   return { ok: okOverall, scope, skillsDir, productName, adapters: results };
 }
 
+// Buffered logger — captures discover warnings so --json runs do not let
+// `console.warn` contaminate the stdout JSON envelope (P2-B). In text mode
+// the buffered warnings are flushed to stderr after the envelope is rendered;
+// in --json mode they are surfaced as a top-level `warnings` array.
+function createBufferedLogger() {
+  const buf = [];
+  return {
+    warnings: buf,
+    warn(message) { buf.push(String(message)); },
+    info() { /* discover layer does not emit info */ },
+  };
+}
+
 /**
  * CLI dispatcher entry (wired into KERNEL_HANDLERS as `activate`). Resolves
  * argv → activateCommand → stdout rendering.
@@ -207,6 +224,7 @@ export async function runActivate(args, ctx) {
   const targets = resolveTargets(args);
   const skillsDir = resolveSkillsDir(args, ctx);
   const dryRun = !!args.dryRun;
+  const logger = createBufferedLogger();
 
   const envelope = activateCommand({
     repoRoot: ctx.repoRoot,
@@ -215,6 +233,7 @@ export async function runActivate(args, ctx) {
     targets,
     skillsDir,
     dryRun,
+    logger,
   });
 
   if (args.json) {
@@ -225,6 +244,7 @@ export async function runActivate(args, ctx) {
       productName: envelope.productName,
       dryRun,
       adapters: envelope.adapters,
+      warnings: logger.warnings,
     }, null, 2) + "\n");
     if (!envelope.ok) process.exitCode = 1;
     return;
@@ -242,6 +262,10 @@ export async function runActivate(args, ctx) {
     } else {
       process.stdout.write(`  ${sym} ${entry.adapter}: failed (${entry.code}) — ${entry.details.message}\n`);
     }
+  }
+  // Flush buffered warnings to stderr in text mode so stdout stays clean.
+  for (const w of logger.warnings) {
+    process.stderr.write(`${w}\n`);
   }
   if (!envelope.ok) process.exitCode = 1;
 }

@@ -9,8 +9,7 @@ import {
   isValidOpenCodeInstructionsPath,
   readHostInstructions,
 } from "../core/skill-metadata.mjs";
-
-const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---/;
+import { FRONTMATTER_RE } from "../core/manifest/schema.mjs";
 
 function warn(logger, message) {
   if (logger && typeof logger.warn === "function") {
