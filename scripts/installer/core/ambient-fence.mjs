@@ -1,5 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import lockfile from "proper-lockfile";
+
+import { ERR_LOCKED } from "./errors.mjs";
 
 // CLI-agnostic ambient-context fence writer.
 //
@@ -135,8 +138,7 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
   // Refuse to mutate a symlinked target — writing through a symlink (e.g.,
   // `~/.claude/CLAUDE.md` → a sensitive file) would silently extend our
   // ambient-context fence into whatever the symlink points at. Review finding
-  // adv-004, retroactive fixup. Use lstat to detect the symlink without
-  // following it.
+  // adv-004. Use lstat to detect the symlink without following it.
   if (fs.existsSync(targetPath)) {
     const lstat = fs.lstatSync(targetPath);
     if (lstat.isSymbolicLink()) {
@@ -146,6 +148,47 @@ export function writeAmbientFence({ targetPath, productName, contentBlock, logge
     }
   }
 
+  // Ensure parent dir exists before the lock — proper-lockfile creates a
+  // sibling `<target>.lock` directory, which requires the parent dir of
+  // targetPath to be present.
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+
+  // v0.8.4 #1 (adv-003) race defense: serialize concurrent activates
+  // against the same target file. proper-lockfile (already a kernel dep,
+  // used by core/filesystem.mjs for state.json locking) is the same lock
+  // mechanism nexel uses elsewhere. realpath:false because targetPath may
+  // not exist yet on first activation. No retries — sync API doesn't
+  // support them; concurrent contention is rare (one user typing
+  // `nexel activate`) and a clean error pointing at the lock file
+  // (`<target>.lock`) is more actionable than silent backoff.
+  //
+  // v0.8.4 adv-r5-B: wrap vendor ELOCKED in typed ERR_LOCKED so the
+  // failure surfaces through activate's --json envelope as ADR-0014
+  // §3-aligned error code rather than leaking proper-lockfile's raw code.
+  let release;
+  try {
+    release = lockfile.lockSync(targetPath, {
+      realpath: false,
+      stale: 10000, // ms — auto-release abandoned locks after 10s
+    });
+  } catch (e) {
+    if (e && e.code === "ELOCKED") {
+      const wrapped = new Error(
+        `writeAmbientFence: another process is writing ${targetPath} (lock at ${targetPath}.lock); wait, or remove the lock dir if stale (>10s old)`,
+      );
+      wrapped.code = ERR_LOCKED;
+      throw wrapped;
+    }
+    throw e;
+  }
+  try {
+    return writeAmbientFenceLocked({ targetPath, productName, contentBlock, logger });
+  } finally {
+    release();
+  }
+}
+
+function writeAmbientFenceLocked({ targetPath, productName, contentBlock, logger }) {
   const fenceBlock = composeFenceBlock(productName, contentBlock);
 
   if (!fs.existsSync(targetPath)) {

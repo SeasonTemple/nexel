@@ -70,7 +70,7 @@ not part of the SPI hook surface.
 - `--dry-run` — report per-adapter `would-activate` without writing.
 - `--json` — emit a machine-readable envelope on stdout.
 
-**`--json` envelope (success and refused/failed cases both):**
+**`--json` envelope (success: verb-shaped per §3):**
 
 ```json
 {
@@ -82,17 +82,44 @@ not part of the SPI hook surface.
   "adapters": [
     { "adapter": "claude", "status": "activated", "details": { "action": "updated", "changed": false, "targetPath": "...", "discoveredCount": 1 } },
     { "adapter": "codex",  "status": "activated", "details": { ... } }
-  ]
+  ],
+  "warnings": []
 }
 ```
 
 Per-adapter `status` is one of `activated` | `would-activate` | `refused`
 | `failed`. The `code` field is present on `refused` and `failed` entries
 only, carrying the typed `ERR_*` constant. Exit code is `0` when every
-requested adapter activated cleanly, non-zero when any refused or failed.
+requested adapter activated cleanly.
 
-Thrown precondition errors (invalid `--scope`, missing `productConfig`,
-unknown `--target`) follow the standard error envelope at §3.
+**`--json` envelope (failure: standard error shape per §3, ADR-0014):**
+
+When any adapter refused / failed, `activate --json` emits the standard
+error envelope shape with per-adapter detail under `details.adapters`:
+
+```json
+{
+  "ok": false,
+  "error": "ERR_ACTIVATE_OPENCODE_REFUSED",
+  "message": "activate: opencode refused — OpenCode activation happens at OpenCode boot...",
+  "details": {
+    "scope": "user",
+    "skillsDir": "/abs/path/skills",
+    "productName": "sample-product",
+    "dryRun": false,
+    "adapters": [
+      { "adapter": "opencode", "status": "refused", "code": "ERR_ACTIVATE_OPENCODE_REFUSED", "details": { "reason": "..." } }
+    ],
+    "warnings": []
+  }
+}
+```
+
+The `error` code comes from the first refused/failed adapter entry; when
+no specific code applies, `ERR_ACTIVATE_FAILED` is used. This unification
+applies to thrown precondition errors too (invalid `--scope`, missing
+`productConfig`, unknown `--target`) — they always followed §3 and
+continue to do so.
 
 Fences are idempotent: re-running with no source changes produces
 byte-identical target files (`changed: false`). Fence markers carry the

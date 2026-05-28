@@ -288,13 +288,19 @@ function spawnActivate(args, { tmpHome, tmpCwd } = {}) {
   });
 }
 
-test("sample bin activate: refuses --target=opencode with ERR_ACTIVATE_OPENCODE_REFUSED", () => {
+test("sample bin activate: refuses --target=opencode with ERR_ACTIVATE_OPENCODE_REFUSED (ADR-0014 unified error envelope)", () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "activate-home-"));
   try {
     const r = spawnActivate(["--target", "opencode", "--scope", "user", "--json"], { tmpHome });
     assert.notEqual(r.status, 0, "opencode refusal must be non-zero exit");
     const parsed = JSON.parse(r.stdout);
-    const opencodeEntry = parsed.adapters.find((a) => a.adapter === "opencode");
+    // v0.8.4 (ADR-0014) — ok:false runs use the AGENT-CLI-CONTRACT §3 standard
+    // error envelope: {ok, error, message, details}. Per-adapter detail
+    // lives under details.adapters[].
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "ERR_ACTIVATE_OPENCODE_REFUSED");
+    assert.match(parsed.message, /opencode/);
+    const opencodeEntry = parsed.details.adapters.find((a) => a.adapter === "opencode");
     assert.equal(opencodeEntry.status, "refused");
     assert.equal(opencodeEntry.code, "ERR_ACTIVATE_OPENCODE_REFUSED");
     assert.ok(opencodeEntry.details.reason.includes("opencode-plugin"));

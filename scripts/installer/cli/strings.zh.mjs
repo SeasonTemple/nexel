@@ -302,10 +302,12 @@ Run '${binName} help' for the complete reference.
   ${binName} activate [--target <id>] [--scope user|project] [flags]
 
 Flags:
-  --target <id>         claude | codex | opencode (逗号分隔可组合)
-                        默认: claude,codex。--target=opencode 会被拒绝 ——
+  --agent, -a <id>      claude | codex | opencode (逗号分隔或重复)
+                        默认: claude,codex。--agent=opencode 会被拒绝 ——
                         OpenCode 激活在 OpenCode 启动时通过 opencode-plugin
                         入口完成，不经此 verb。
+                        --target 作 deprecated alias 保留 (v0.8.x compat)，
+                        新脚本请用 --agent。
   --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
                           project → ./CLAUDE.md + ./AGENTS.md (默认)
   --skills-dir <path>   覆盖 skills 目录 (默认: <productConfig.defaultSkillsDir>)

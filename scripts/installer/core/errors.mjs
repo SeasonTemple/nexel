@@ -78,6 +78,10 @@ export const ERR_MISSING_PRODUCT_CONFIG = "ERR_MISSING_PRODUCT_CONFIG";
 export const ERR_ACTIVATE_OPENCODE_REFUSED = "ERR_ACTIVATE_OPENCODE_REFUSED";
 // ERR_ACTIVATE_INVALID_SCOPE — `--scope` must be one of `user`, `project`.
 export const ERR_ACTIVATE_INVALID_SCOPE = "ERR_ACTIVATE_INVALID_SCOPE";
+// ERR_ACTIVATE_FAILED — fallback code for the standard error envelope when
+// a `nexel activate --json` run has ok:false but no first failure carries a
+// more specific code (e.g., aggregate failure). Per ADR-0014.
+export const ERR_ACTIVATE_FAILED = "ERR_ACTIVATE_FAILED";
 
 // ---------- Error classes (new ones; existing classes stay in their owning modules) ----------
 

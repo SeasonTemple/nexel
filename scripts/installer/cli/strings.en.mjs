@@ -304,10 +304,12 @@ Usage:
   ${binName} activate [--target <id>] [--scope user|project] [flags]
 
 Flags:
-  --target <id>         claude | codex | opencode (comma-separate to combine).
-                        Default: claude,codex. --target=opencode is refused —
+  --agent, -a <id>      claude | codex | opencode (comma-separate or repeat).
+                        Default: claude,codex. --agent=opencode is refused —
                         OpenCode activation happens at OpenCode boot via the
                         opencode-plugin entry, not via this verb.
+                        --target is honored as a deprecated alias (v0.8.x
+                        compat); prefer --agent in new scripts.
   --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
                           project → ./CLAUDE.md + ./AGENTS.md (default)
   --skills-dir <path>   override skills dir (default: <productConfig.defaultSkillsDir>)

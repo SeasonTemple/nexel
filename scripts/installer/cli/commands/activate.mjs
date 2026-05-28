@@ -47,9 +47,29 @@ function resolveSkillsDir(args, ctx) {
   return path.resolve(ctx.repoRoot, skillsDirName);
 }
 
-function resolveTargets(args) {
-  if (!args.target) return [...SUPPORTED_TARGETS];
-  return args.target.split(",").map((s) => s.trim()).filter(Boolean);
+function resolveTargets(args, logger) {
+  // v0.8.4 M-04 + adv-r5-A fix: prefer `--agent` (every other verb's
+  // adapter selector). `--target` remains as a deprecated alias. When
+  // BOTH are passed, union them and warn — v0.8.4 review caught that
+  // silently dropping --target hid user intent (e.g.,
+  // `--target opencode --agent claude` looked like a successful
+  // dual-target run but only claude activated).
+  const agentSet = Array.isArray(args.adapters) && args.adapters.length > 0;
+  const targetSet = !!args.target;
+  const fromTarget = targetSet
+    ? args.target.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  if (agentSet && targetSet) {
+    if (logger && typeof logger.warn === "function") {
+      logger.warn(
+        `activate: --target is a deprecated alias for --agent; both were provided. Activating the union: ${[...args.adapters, ...fromTarget].join(",")}. Use --agent only in new scripts.`,
+      );
+    }
+    return [...new Set([...args.adapters, ...fromTarget])];
+  }
+  if (agentSet) return [...args.adapters];
+  if (targetSet) return fromTarget;
+  return [...SUPPORTED_TARGETS];
 }
 
 function targetClaudeMdFor(scope) {
@@ -221,10 +241,10 @@ function createBufferedLogger() {
  */
 export async function runActivate(args, ctx) {
   const scope = resolveScope(args);
-  const targets = resolveTargets(args);
+  const logger = createBufferedLogger();
+  const targets = resolveTargets(args, logger);
   const skillsDir = resolveSkillsDir(args, ctx);
   const dryRun = !!args.dryRun;
-  const logger = createBufferedLogger();
 
   const envelope = activateCommand({
     repoRoot: ctx.repoRoot,
@@ -237,16 +257,46 @@ export async function runActivate(args, ctx) {
   });
 
   if (args.json) {
+    // v0.8.4 #3 (AC-03 + ADR-0014): unify the --json failure envelope with
+    // AGENT-CLI-CONTRACT §3's standard error shape `{ok:false, error,
+    // message, details}`. Success runs keep the verb-shaped envelope per
+    // §3's "Success envelopes are verb-shaped" clause. On any per-adapter
+    // refused/failed entry, the run is ok:false → standard error envelope
+    // with the first failure's code surfaced as `error`, per-adapter
+    // detail under `details.adapters`.
+    if (envelope.ok) {
+      process.stdout.write(JSON.stringify({
+        ok: true,
+        scope: envelope.scope,
+        skillsDir: envelope.skillsDir,
+        productName: envelope.productName,
+        dryRun,
+        adapters: envelope.adapters,
+        warnings: logger.warnings,
+      }, null, 2) + "\n");
+      return;
+    }
+    const firstFailure = envelope.adapters.find((a) => a.status === "refused" || a.status === "failed");
+    const errorCode = firstFailure?.code ?? "ERR_ACTIVATE_FAILED";
+    const message = firstFailure?.status === "refused"
+      ? `activate: ${firstFailure.adapter} refused — ${firstFailure.details?.reason ?? "see details"}`
+      : firstFailure?.details?.message
+        ? `activate: ${firstFailure.adapter} failed — ${firstFailure.details.message}`
+        : "activate: one or more adapters did not complete cleanly";
     process.stdout.write(JSON.stringify({
-      ok: envelope.ok,
-      scope: envelope.scope,
-      skillsDir: envelope.skillsDir,
-      productName: envelope.productName,
-      dryRun,
-      adapters: envelope.adapters,
-      warnings: logger.warnings,
+      ok: false,
+      error: errorCode,
+      message,
+      details: {
+        scope: envelope.scope,
+        skillsDir: envelope.skillsDir,
+        productName: envelope.productName,
+        dryRun,
+        adapters: envelope.adapters,
+        warnings: logger.warnings,
+      },
     }, null, 2) + "\n");
-    if (!envelope.ok) process.exitCode = 1;
+    process.exitCode = 1;
     return;
   }
 
