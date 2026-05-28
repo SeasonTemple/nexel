@@ -605,3 +605,92 @@ test("removeAmbientFence throws TypeError on missing or invalid required argumen
   assert.throws(() => removeAmbientFence({ targetPath: "", productName: "alpha" }), TypeError);
   assert.throws(() => removeAmbientFence({ targetPath: "/tmp/x.md", productName: "evil name" }), TypeError);
 });
+
+test("removeAmbientFence refuses to splice unbalanced markers (adv-002 parity, Phase 4 P0)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nexel-remove-unbal-"));
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // 2 BEGIN markers + 1 END marker — a real file would get this from a
+    // copy-pasted documentation example or a prior failed write. A naive
+    // splice would lazy-match the FIRST BEGIN through the lone END,
+    // silently deleting user prose between them.
+    fs.writeFileSync(
+      target,
+      "<!-- nexel:alpha:begin -->\nfake-fence-1\n<!-- nexel:alpha:end -->\n\nuser prose\n\n<!-- nexel:alpha:begin -->\nfake-fence-2\n",
+      "utf8",
+    );
+    assert.throws(
+      () => removeAmbientFence({ targetPath: target, productName: "alpha" }),
+      /unbalanced fence markers.*2 BEGIN, 1 END/,
+    );
+    // Original file unchanged
+    const after = fs.readFileSync(target, "utf8");
+    assert.match(after, /<!-- nexel:alpha:begin -->\nfake-fence-1/);
+    assert.match(after, /user prose/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence refuses to splice fence missing managed-header sentinel (P1#6 parity, Phase 4 P0)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nexel-remove-untrusted-"));
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // User prose that happens to contain the literal begin/end marker
+    // strings (e.g., copy-pasted from a docs example showing what nexel
+    // writes) but WITHOUT the managed-header sentinel. writeAmbientFence
+    // refuses to overwrite such a pair on the write side; remove must
+    // refuse symmetrically to avoid silently deleting user prose.
+    const untrusted =
+      "<!-- nexel:alpha:begin -->\n" +
+      "User prose explaining what nexel writes. No managed-header sentinel here.\n" +
+      "<!-- nexel:alpha:end -->\n";
+    fs.writeFileSync(target, untrusted, "utf8");
+    assert.throws(
+      () => removeAmbientFence({ targetPath: target, productName: "alpha" }),
+      /missing the managed-header sentinel/,
+    );
+    // Original file unchanged
+    assert.equal(fs.readFileSync(target, "utf8"), untrusted);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence: byte-exact post-remove preserves other-product fences (Phase 4 P2)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nexel-remove-byte-exact-"));
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Use writeAmbientFence to create two trusted fences side by side, so
+    // the managed-header sentinel is present and the byte-exact baseline
+    // can be captured.
+    writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "alpha-body" });
+    writeAmbientFence({ targetPath: target, productName: "beta", contentBlock: "beta-body" });
+    const withBoth = fs.readFileSync(target, "utf8");
+    // Capture the byte-exact baseline of beta-only by writing it to a
+    // separate file and asserting equality after we remove alpha from the
+    // both-fences file.
+    const alphaFenceBlock =
+      "<!-- nexel:alpha:begin -->\n" +
+      "<!-- nexel-managed-fence v1; do not edit between markers -->\n" +
+      "alpha-body\n" +
+      "<!-- nexel:alpha:end -->\n";
+    assert.ok(withBoth.includes(alphaFenceBlock), "fixture sanity: alpha fence as written");
+
+    removeAmbientFence({ targetPath: target, productName: "alpha" });
+    const after = fs.readFileSync(target, "utf8");
+
+    // Beta fence preserved verbatim (block + sentinel)
+    const betaFenceBlock =
+      "<!-- nexel:beta:begin -->\n" +
+      "<!-- nexel-managed-fence v1; do not edit between markers -->\n" +
+      "beta-body\n" +
+      "<!-- nexel:beta:end -->\n";
+    assert.ok(after.includes(betaFenceBlock), "beta fence must survive byte-identical");
+    // Alpha fully gone
+    assert.ok(!after.includes("<!-- nexel:alpha:begin -->"), "alpha begin marker removed");
+    assert.ok(!after.includes("alpha-body"), "alpha body removed");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -365,6 +365,30 @@ export function removeAmbientFence({ targetPath, productName, logger }) {
       return { action: "noop", changed: false, targetPath, reason: "no fence for this product" };
     }
 
+    // adv-002 parity: unbalanced-marker guard. writeAmbientFence:226-232
+    // refuses to splice when begin/end counts diverge or exceed 1; the same
+    // class of orphan markers is a data-loss landmine on the remove path —
+    // a lazy fenceRegex match would silently engulf prose between the
+    // mismatched markers. Mirror the refusal.
+    const beginCount = (before.match(new RegExp(escapeRegex(beginMarker(productName)), "g")) || []).length;
+    const endCount = (before.match(new RegExp(escapeRegex(endMarker(productName)), "g")) || []).length;
+    if (beginCount > 1 || endCount > 1 || beginCount !== endCount) {
+      throw new Error(
+        `removeAmbientFence: unbalanced fence markers for "${productName}" in ${targetPath} (${beginCount} BEGIN, ${endCount} END) — refusing to splice; would silently engulf prose between mismatched markers. Inspect and clean up the file manually before re-running.`,
+      );
+    }
+
+    // P1#6 parity: isFenceTrusted check. writeAmbientFence:238 refuses to
+    // overwrite a marker pair lacking the managed-header sentinel, because
+    // the markers may be user prose that coincidentally matches. Mirror on
+    // the remove path so user prose enclosed in literal nexel-shaped
+    // markers (e.g., a copy-pasted example) is not silently deleted.
+    if (!isFenceTrusted(before, productName)) {
+      throw new Error(
+        `removeAmbientFence: fence for "${productName}" in ${targetPath} is missing the managed-header sentinel (${MANAGED_HEADER.trim()}) — refusing to splice; this fence was not written by writeAmbientFence and may be user prose. Inspect manually before re-running.`,
+      );
+    }
+
     // Splice the fence + the surrounding separator bytes the write path
     // emitted. writeAmbientFence's append branch emits "\n\n" before the
     // fence (when prior content exists) and "\n" after; the created branch
@@ -381,10 +405,20 @@ export function removeAmbientFence({ targetPath, productName, logger }) {
       cutEnd = fenceEnd + 1;
     }
 
+    // Phase 4 P1 fix: collapse only the seam left at cutStart, not globally.
+    // The original global `replace(/\n{3,}/g, "\n\n")` mutated runs of 3+
+    // newlines in unrelated user prose. Targeted normalization at the
+    // splice site preserves byte-identity elsewhere in the file.
     let after = before.slice(0, cutStart) + before.slice(cutEnd);
-    // Collapse any remaining run of 3+ newlines into exactly 2 so back-to-
-    // back fence removals do not stack blank-line debris.
-    after = after.replace(/\n{3,}/g, "\n\n");
+    if (cutStart > 0 && cutStart < after.length) {
+      const seamStart = Math.max(0, cutStart - 2);
+      const seamEnd = Math.min(after.length, cutStart + 2);
+      const seam = after.slice(seamStart, seamEnd);
+      const normalized = seam.replace(/\n{3,}/g, "\n\n");
+      if (normalized !== seam) {
+        after = after.slice(0, seamStart) + normalized + after.slice(seamEnd);
+      }
+    }
 
     fs.writeFileSync(targetPath, after);
     if (logger?.info) logger.info(`ambient-fence: removed fence for ${productName} from ${targetPath}`);
