@@ -107,11 +107,42 @@ function runRegisteredRules(manifest, options, findings) {
   }
 }
 
+// Phase 4 P1 fix: rule check returning a non-array value (Promise, single
+// Finding object, undefined) was previously silently dropped, leaving the
+// rule author with zero diagnostic about why their rule produced no
+// findings. Quarantine the non-array return as a parse-error so the
+// mistake surfaces immediately. Promises specifically are diagnosed with
+// a clearer "async rules unsupported" message — they would otherwise
+// dangle and trigger unhandledRejection later.
+function isPromiseLike(v) {
+  return v != null && typeof v === "object" && typeof v.then === "function";
+}
+
+function quarantineNonArray(rule, manifest, ctx, out, findings, scope) {
+  if (Array.isArray(out)) return out;
+  const looksLikeFinding = out && typeof out === "object" && typeof out.message === "string";
+  let message;
+  if (isPromiseLike(out)) {
+    message = `rule "${rule.id}" returned a Promise; async rules are not supported (rule.check must return Finding[])`;
+  } else if (looksLikeFinding) {
+    message = `rule "${rule.id}" returned a single Finding instead of Finding[]; wrap it in an array`;
+  } else {
+    message = `rule "${rule.id}" returned a non-array value (${typeof out}); rule.check must return Finding[]`;
+  }
+  findings.push({
+    severity: "parse-error",
+    section: "registry",
+    id: rule.id,
+    message: `${message} [scope=${scope}]`,
+  });
+  return [];
+}
+
 function invokeRule(rule, manifest, ctx, findings) {
   try {
     if (rule.appliesTo === "manifest") {
       const out = rule.check(manifest, ctx);
-      return Array.isArray(out) ? out : [];
+      return quarantineNonArray(rule, manifest, ctx, out, findings, "manifest");
     }
     const section = `${rule.appliesTo}s`;
     const items = manifest[section];
@@ -119,7 +150,8 @@ function invokeRule(rule, manifest, ctx, findings) {
     const aggregated = [];
     for (const key of Object.keys(items)) {
       const out = rule.check(items[key], ctx);
-      if (Array.isArray(out)) aggregated.push(...out);
+      const normalized = quarantineNonArray(rule, manifest, ctx, out, findings, `${rule.appliesTo}:${key}`);
+      aggregated.push(...normalized);
     }
     return aggregated;
   } catch (err) {
