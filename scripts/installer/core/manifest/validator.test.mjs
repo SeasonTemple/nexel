@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import { validateManifest, exitCodeFor, formatFindings } from "./validator.mjs";
 import { loadManifest } from "./loader.mjs";
+import {
+  registerValidatorRule,
+  _resetRegistryForTests,
+} from "../registry.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_MANIFEST = path.resolve(HERE, "../../../../examples/sample-product/sample.install.json");
@@ -141,3 +145,145 @@ test("validateManifest: host-instructions missing file error message cites host-
 // assertion; we therefore cover only the reachable branch (missing-file)
 // above and document this as a known unreachable code path. Eliminating
 // the branch is a v0.8.x+ cleanup candidate.
+
+// -----------------------------------------------------------------------
+// Pluggable Validator Rule Registry integration (ADR-0016).
+//
+// Every test in this block calls `_resetRegistryForTests()` first AND at
+// the end so neither precondition nor postcondition leaks into other
+// suites (the registry is a module-scope singleton).
+// -----------------------------------------------------------------------
+
+function withRegistryReset(fn) {
+  _resetRegistryForTests();
+  try {
+    fn();
+  } finally {
+    _resetRegistryForTests();
+  }
+}
+
+test("validateManifest: registry — with no rules registered, behavior identical to v0.8.5", () => {
+  withRegistryReset(() => {
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    assert.deepEqual(findings, []);
+    assert.equal(exitCodeFor(findings), 0);
+  });
+});
+
+test("validateManifest: registry — manifest-scope rule runs exactly once per validateManifest call", () => {
+  withRegistryReset(() => {
+    let invocations = 0;
+    let lastSubject = null;
+    registerValidatorRule({
+      id: "test-manifest-rule",
+      appliesTo: "manifest",
+      check: (subject) => {
+        invocations += 1;
+        lastSubject = subject;
+        return [];
+      },
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    validateManifest(m);
+    assert.equal(invocations, 1);
+    assert.equal(lastSubject, m, "manifest-scope check receives the manifest object");
+  });
+});
+
+test("validateManifest: registry — skill-scope rule iterates every entry in manifest.skills", () => {
+  withRegistryReset(() => {
+    const seenIds = [];
+    registerValidatorRule({
+      id: "test-skill-rule",
+      appliesTo: "skill",
+      check: (skill) => {
+        seenIds.push(skill && skill.id);
+        return [];
+      },
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    validateManifest(m);
+    const expected = Object.values(m.skills).map((s) => s.id);
+    assert.deepEqual(seenIds, expected, "skill-scope rule visits every manifest.skills entry in order");
+  });
+});
+
+test("validateManifest: registry — rule emitting findings appears in output; exitCodeFor returns 1", () => {
+  withRegistryReset(() => {
+    registerValidatorRule({
+      id: "test-emit-error",
+      appliesTo: "manifest",
+      check: () => [
+        { severity: "error", section: "custom", id: "x1", message: "policy violation" },
+      ],
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    const ours = findings.filter((f) => f.section === "custom");
+    assert.equal(ours.length, 1);
+    assert.equal(ours[0].id, "x1");
+    assert.equal(ours[0].severity, "error");
+    assert.equal(ours[0].message, "policy violation");
+    assert.equal(exitCodeFor(findings), 1);
+  });
+});
+
+test("validateManifest: registry — rule emitting parse-error → exitCodeFor returns 2", () => {
+  withRegistryReset(() => {
+    registerValidatorRule({
+      id: "test-emit-parse",
+      appliesTo: "manifest",
+      check: () => [
+        { severity: "parse-error", section: "custom", id: null, message: "unparseable" },
+      ],
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    assert.equal(exitCodeFor(findings), 2);
+  });
+});
+
+test("validateManifest: registry — malformed rule output → parse-error with section 'registry' and rule id", () => {
+  withRegistryReset(() => {
+    registerValidatorRule({
+      id: "test-malformed",
+      appliesTo: "manifest",
+      check: () => [
+        // missing `message` and `section` — must be quarantined by validator
+        { severity: "error", id: "x" },
+      ],
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    const quarantined = findings.filter(
+      (f) => f.section === "registry" && f.id === "test-malformed",
+    );
+    assert.equal(quarantined.length, 1);
+    assert.equal(quarantined[0].severity, "parse-error");
+    assert.match(quarantined[0].message, /test-malformed/);
+    // exit code: parse-error wins
+    assert.equal(exitCodeFor(findings), 2);
+  });
+});
+
+test("validateManifest: registry — productConfig threaded into rule ctx", () => {
+  withRegistryReset(() => {
+    let receivedCtx = null;
+    registerValidatorRule({
+      id: "test-ctx",
+      appliesTo: "manifest",
+      check: (_subject, ctx) => {
+        receivedCtx = ctx;
+        return [];
+      },
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const stubConfig = { productName: "stub", skillIdPrefix: "stub" };
+    validateManifest(m, { productConfig: stubConfig });
+    assert.ok(receivedCtx, "rule ctx must be provided");
+    assert.equal(receivedCtx.productConfig, stubConfig);
+    assert.equal(Object.isFrozen(receivedCtx), true, "ctx is frozen");
+  });
+});

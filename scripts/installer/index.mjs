@@ -60,6 +60,9 @@ export { validateManifest, exitCodeFor, formatFindings } from "./core/manifest/v
 export { SCHEMA_VERSION, PROFILES, CATEGORIES, HOSTS } from "./core/manifest/schema.mjs";
 export { detectDrift } from "./core/manifest/drift.mjs";
 
+// ---------- v0.9: Pluggable Validator Rule Registry (ADR-0016) ----------
+export { registerValidatorRule, listValidatorRules } from "./core/registry.mjs";
+
 // ---------- v0.7: marketplace lockstep helper ----------
 export { verifyMarketplaceLockstep } from "./core/marketplace-lockstep.mjs";
 

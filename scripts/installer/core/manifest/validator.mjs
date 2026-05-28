@@ -23,6 +23,7 @@ import {
   HOST_INSTRUCTIONS_KEY,
   OPENCODE_INSTRUCTIONS_KEY,
 } from "../skill-metadata.mjs";
+import { listValidatorRules } from "../registry.mjs";
 
 function isInsideRepo(repoRoot, candidate) {
   if (typeof candidate !== "string" || candidate.length === 0) return false;
@@ -72,7 +73,81 @@ export function validateManifest(manifest, options = {}) {
   validateBundles(manifest.bundles, manifest.skills, manifest.agents, manifest.rules, findings);
   validateCaseFoldedPathCollisions(manifest, findings);
 
+  runRegisteredRules(manifest, options, findings);
+
   return findings;
+}
+
+// Iterate the kernel-generic Pluggable Validator Rule Registry (ADR-0016).
+// Rules execute AFTER built-in checks so registry findings appear at the
+// tail of the finding list (registration order). All findings are sanity-
+// checked against the Finding envelope shape (INTERLOCK LOCK 2); malformed
+// rule output is converted to a `parse-error` finding with section
+// "registry" and id = rule.id so `formatFindings` template never receives
+// undefined fields.
+function runRegisteredRules(manifest, options, findings) {
+  const rules = listValidatorRules();
+  if (rules.length === 0) return;
+  const ctx = Object.freeze({ productConfig: options.productConfig ?? null });
+  for (const rule of rules) {
+    const out = invokeRule(rule, manifest, ctx, findings);
+    if (out === null) continue;
+    for (const finding of out) {
+      if (!isFindingShape(finding)) {
+        findings.push({
+          severity: "parse-error",
+          section: "registry",
+          id: rule.id,
+          message: `rule "${rule.id}" returned a malformed finding: ${safeStringify(finding)}`,
+        });
+        continue;
+      }
+      findings.push(finding);
+    }
+  }
+}
+
+function invokeRule(rule, manifest, ctx, findings) {
+  try {
+    if (rule.appliesTo === "manifest") {
+      const out = rule.check(manifest, ctx);
+      return Array.isArray(out) ? out : [];
+    }
+    const section = `${rule.appliesTo}s`;
+    const items = manifest[section];
+    if (!items || typeof items !== "object") return [];
+    const aggregated = [];
+    for (const key of Object.keys(items)) {
+      const out = rule.check(items[key], ctx);
+      if (Array.isArray(out)) aggregated.push(...out);
+    }
+    return aggregated;
+  } catch (err) {
+    findings.push({
+      severity: "parse-error",
+      section: "registry",
+      id: rule.id,
+      message: `rule "${rule.id}" threw during check: ${err && err.message ? err.message : String(err)}`,
+    });
+    return null;
+  }
+}
+
+function isFindingShape(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (value.severity !== "error" && value.severity !== "parse-error") return false;
+  if (typeof value.section !== "string" || value.section.length === 0) return false;
+  if (value.id !== null && typeof value.id !== "string") return false;
+  if (typeof value.message !== "string" || value.message.length === 0) return false;
+  return true;
+}
+
+function safeStringify(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function validateAgents(agents, repoRoot, findings, agentNamePrefix = null) {

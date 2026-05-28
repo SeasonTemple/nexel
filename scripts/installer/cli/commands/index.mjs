@@ -136,6 +136,7 @@ function loadValidatedManifest(repoRoot, productConfig) {
     ...defaultPaths(repoRoot, productConfig),
     skillIdPrefix: productConfig?.skillIdPrefix,
     agentNamePrefix: productConfig?.agentNamePrefix,
+    productConfig,
   };
   const findings = validateManifest(manifest, validateOpts);
   if (findings.length > 0) {
