@@ -79,6 +79,13 @@ export const ERR_ACTIVATE_OPENCODE_REFUSED = "ERR_ACTIVATE_OPENCODE_REFUSED";
 // ERR_ACTIVATE_INVALID_SCOPE — `--scope` must be one of `user`, `project`.
 export const ERR_ACTIVATE_INVALID_SCOPE = "ERR_ACTIVATE_INVALID_SCOPE";
 
+// Deactivate verb errors (v0.9 / ADR-0017).
+// ERR_DEACTIVATE_OPENCODE_REFUSED — symmetric with the activate refusal:
+// OpenCode lifecycle is owned by its own runtime entry, not by this verb.
+export const ERR_DEACTIVATE_OPENCODE_REFUSED = "ERR_DEACTIVATE_OPENCODE_REFUSED";
+// ERR_DEACTIVATE_INVALID_SCOPE — parallel to ERR_ACTIVATE_INVALID_SCOPE.
+export const ERR_DEACTIVATE_INVALID_SCOPE = "ERR_DEACTIVATE_INVALID_SCOPE";
+
 // ---------- Error classes (new ones; existing classes stay in their owning modules) ----------
 
 /**

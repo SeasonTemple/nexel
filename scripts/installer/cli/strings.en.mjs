@@ -38,6 +38,7 @@ export const strings = Object.freeze({
   export                     Dump installed selection set as JSON to stdout (portable across machines)
   import                     Read selection-set JSON from stdin and install (pair with export)
   activate                   Write ambient-context fences into CLAUDE.md / AGENTS.md for installed skills
+  deactivate                 Remove this product's ambient-context fence from CLAUDE.md / AGENTS.md
   validate <path/SKILL.md>   Lint a single SKILL.md frontmatter without scanning the whole repo
   scaffold                   Generate three-platform plugin layout from ProductConfig
                              (only when createCli({enablePluginScaffolder: true}))
@@ -326,6 +327,38 @@ Examples:
   ${binName} activate --scope=project --json
   ${binName} activate --target=claude --dry-run
   ${binName} activate --target=opencode    # exit 1 with ERR_ACTIVATE_OPENCODE_REFUSED
+
+Run '${binName} help' for the complete reference.
+`,
+      deactivate: ({ binName }) => `${binName} deactivate — remove this product's ambient-context fence
+
+Usage:
+  ${binName} deactivate [--agent <id>] [--scope user|project] [flags]
+
+Flags:
+  --agent, -a <id>      claude | codex | opencode (comma-separate or repeat).
+                        Default: claude,codex. --agent=opencode is refused —
+                        OpenCode lifecycle is owned by the opencode-plugin
+                        runtime entry, not by this verb.
+                        --target is honored as a deprecated alias; prefer
+                        --agent in new scripts.
+  --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
+                          project → ./CLAUDE.md + ./AGENTS.md (default)
+  --dry-run             report would-deactivate per adapter; no file writes
+  --json                machine-readable envelope on stdout
+
+Each adapter entry in the JSON envelope carries { adapter, status, code?, details }.
+Status values: deactivated | would-deactivate | refused | failed.
+
+Removes ONLY the fence written by this product (exact-invert of activate);
+other products' fences in the same host file are preserved byte-identically.
+Idempotent: deactivating twice yields { action: "noop", changed: false } on
+the second run. Refuses to write through symlinked target files.
+
+Examples:
+  ${binName} deactivate --scope=project --json
+  ${binName} deactivate --agent=claude --dry-run
+  ${binName} deactivate --target=opencode    # exit 1 with ERR_DEACTIVATE_OPENCODE_REFUSED
 
 Run '${binName} help' for the complete reference.
 `,

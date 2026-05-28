@@ -272,3 +272,124 @@ export function hasAmbientFence(targetPath, productName) {
   const text = fs.readFileSync(targetPath, "utf8");
   return fenceRegex(productName).test(text);
 }
+
+/**
+ * Idempotently remove the fence block written for `productName` from
+ * `targetPath`. Exact-invert of `writeAmbientFence`: only THIS product's
+ * fence is spliced; other products' fences in the same file remain
+ * byte-identical (per-product isolation invariant, ADR-0017 / INTERLOCK
+ * LOCK 1; locked by `ambient-fence.test.mjs` multi-product witnesses).
+ *
+ * Return shape mirrors `writeAmbientFence`: `{ action, changed, targetPath, reason? }`:
+ *   action ∈ {
+ *     "removed" — fence existed and was spliced out (changed: true)
+ *     "noop"    — nothing to remove (file missing OR no fence for this product)
+ *   }
+ *   `reason` (string) accompanies `noop` to disambiguate the cause.
+ *
+ * Lock semantics: re-uses `<target>.lock` via proper-lockfile so concurrent
+ * activate+deactivate against one target serialize through one lock.
+ *
+ * Symlink defenses mirror `writeAmbientFence` (adv-004 target-symlink refusal,
+ * adv-r5-C v0.8.5 lock-symlink DOS defense). TOCTOU defense follow-up
+ * (ADR-0019 / PR 4) will harden the lstat→lockSync race on both write and
+ * remove paths uniformly.
+ *
+ * @param {Object} opts
+ * @param {string} opts.targetPath   Absolute path to splice the fence out of.
+ * @param {string} opts.productName  Identifies the fence — must be non-empty.
+ * @param {Object} [opts.logger]     Logger with optional `info` / `warn`.
+ * @returns {{ action: "removed"|"noop", changed: boolean, targetPath: string, reason?: string }}
+ */
+export function removeAmbientFence({ targetPath, productName, logger }) {
+  if (typeof targetPath !== "string" || !targetPath) {
+    throw new TypeError("removeAmbientFence: targetPath must be a non-empty string");
+  }
+  assertSafeProductName(productName);
+
+  // Missing host file → nothing to remove. Symmetric with hasAmbientFence's
+  // missing-file handling (returns false rather than throwing).
+  if (!fs.existsSync(targetPath)) {
+    return { action: "noop", changed: false, targetPath, reason: "host file does not exist" };
+  }
+
+  // Target-symlink refusal (adv-004 parity with writeAmbientFence:142-149).
+  // Without this, deactivate through a symlink would mutate whatever the
+  // symlink resolves to — same threat model as the activate side.
+  const targetLstat = fs.lstatSync(targetPath);
+  if (targetLstat.isSymbolicLink()) {
+    throw new Error(
+      `removeAmbientFence: refusing to write through symlink at ${targetPath}; resolve the symlink or move the file before deactivating`,
+    );
+  }
+
+  // Lock-symlink defense (adv-r5-C parity with writeAmbientFence:161-169).
+  // Mirror the v0.8.5 symlink-at-lock DOS defense on the remove path so a
+  // planted lock symlink cannot permanently block deactivate either.
+  const lockPath = `${targetPath}.lock`;
+  if (fs.existsSync(lockPath)) {
+    const lockLstat = fs.lstatSync(lockPath);
+    if (lockLstat.isSymbolicLink()) {
+      throw new Error(
+        `removeAmbientFence: refusing to lock through a symlink at ${lockPath}; this is either a planted DOS or stale state. Remove the symlink manually and re-run.`,
+      );
+    }
+  }
+
+  // proper-lockfile reuse: same lock path as writeAmbientFence so concurrent
+  // activate+deactivate against the same target serialize. realpath:false
+  // because targetPath already exists at this point (no follow-symlink).
+  let release;
+  try {
+    release = lockfile.lockSync(targetPath, {
+      realpath: false,
+      stale: 10000,
+    });
+  } catch (e) {
+    if (e && e.code === "ELOCKED") {
+      const wrapped = new Error(
+        `removeAmbientFence: another process is writing ${targetPath} (lock at ${targetPath}.lock); wait, or remove the lock dir if stale (>10s old)`,
+      );
+      wrapped.code = ERR_LOCKED;
+      throw wrapped;
+    }
+    throw e;
+  }
+
+  try {
+    const before = fs.readFileSync(targetPath, "utf8");
+    const re = fenceRegex(productName);
+    const match = before.match(re);
+    if (!match) {
+      if (logger?.info) logger.info(`ambient-fence: ${targetPath} has no fence for ${productName} (noop)`);
+      return { action: "noop", changed: false, targetPath, reason: "no fence for this product" };
+    }
+
+    // Splice the fence + the surrounding separator bytes the write path
+    // emitted. writeAmbientFence's append branch emits "\n\n" before the
+    // fence (when prior content exists) and "\n" after; the created branch
+    // emits only "\n" after. Strip these to keep the file tidy.
+    const fenceStart = match.index;
+    const fenceEnd = fenceStart + match[0].length;
+
+    let cutStart = fenceStart;
+    if (fenceStart >= 2 && before.slice(fenceStart - 2, fenceStart) === "\n\n") {
+      cutStart = fenceStart - 2;
+    }
+    let cutEnd = fenceEnd;
+    if (before[fenceEnd] === "\n") {
+      cutEnd = fenceEnd + 1;
+    }
+
+    let after = before.slice(0, cutStart) + before.slice(cutEnd);
+    // Collapse any remaining run of 3+ newlines into exactly 2 so back-to-
+    // back fence removals do not stack blank-line debris.
+    after = after.replace(/\n{3,}/g, "\n\n");
+
+    fs.writeFileSync(targetPath, after);
+    if (logger?.info) logger.info(`ambient-fence: removed fence for ${productName} from ${targetPath}`);
+    return { action: "removed", changed: true, targetPath };
+  } finally {
+    release();
+  }
+}
