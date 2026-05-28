@@ -286,4 +286,49 @@ test("validateManifest: registry — productConfig threaded into rule ctx", () =
     assert.equal(receivedCtx.productConfig, stubConfig);
     assert.equal(Object.isFrozen(receivedCtx), true, "ctx is frozen");
   });
+
+  test("validateManifest: registry — rule returning a Promise quarantined as parse-error (Phase 4 P1)", () => {
+    registerValidatorRule({
+      id: "test-async-rule",
+      appliesTo: "manifest",
+      check: () => Promise.resolve([]),
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    const offending = findings.find((f) => f.id === "test-async-rule");
+    assert.ok(offending, "Promise return must surface as a finding, not be silently dropped");
+    assert.equal(offending.severity, "parse-error");
+    assert.equal(offending.section, "registry");
+    assert.match(offending.message, /async rules are not supported/);
+    assert.equal(exitCodeFor(findings), 2);
+  });
+
+  test("validateManifest: registry — rule returning a single Finding (not wrapped) quarantined (Phase 4 P1)", () => {
+    registerValidatorRule({
+      id: "test-single-finding",
+      appliesTo: "manifest",
+      check: () => ({ severity: "error", section: "root", id: null, message: "forgot to wrap" }),
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    const offending = findings.find((f) => f.id === "test-single-finding");
+    assert.ok(offending, "single-Finding return must surface as a finding");
+    assert.equal(offending.severity, "parse-error");
+    assert.equal(offending.section, "registry");
+    assert.match(offending.message, /single Finding instead of Finding\[\]/);
+  });
+
+  test("validateManifest: registry — rule returning undefined quarantined (Phase 4 P1)", () => {
+    registerValidatorRule({
+      id: "test-undef",
+      appliesTo: "manifest",
+      check: () => undefined,
+    });
+    const m = loadManifest(SAMPLE_MANIFEST);
+    const findings = validateManifest(m);
+    const offending = findings.find((f) => f.id === "test-undef");
+    assert.ok(offending, "undefined return must surface as a finding");
+    assert.equal(offending.severity, "parse-error");
+    assert.match(offending.message, /non-array value \(undefined\)/);
+  });
 });
