@@ -2,6 +2,11 @@
 # nexel repo pre-push: gate tag pushes on a per-tag review marker bound
 # to the tag's referenced commit SHA.
 #
+# Harness hardening: scrub git env vars husky exports (see pre-commit
+# header for full rationale). Without this, `git rev-parse <sha>^{commit}`
+# below would honor GIT_DIR over the inherited shell context.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+#
 # When a `git push` includes any `refs/tags/v*` ref, this hook checks for
 # `.nexel/release-blessed-<tag>` (regular file, not a symlink) and verifies
 # its embedded `commit=<sha>` line matches the local_sha being pushed for

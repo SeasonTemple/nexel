@@ -7,6 +7,18 @@
 // process so future regressions of that class — and tag deletion, symlink,
 // missing/malformed marker, SHA mismatch — fail loudly.
 
+// Harness hardening: when this test runs under a husky hook context
+// (the recursive case where pre-commit fires npm test which runs this
+// suite), GIT_DIR et al. are inherited from the hook and would cause
+// fixture `git init` + `git commit` calls below to write into the
+// parent worktree's refs. Scrub them at module top so fixture-git ops
+// stay confined to their tmpdirs.
+delete process.env.GIT_DIR;
+delete process.env.GIT_WORK_TREE;
+delete process.env.GIT_INDEX_FILE;
+delete process.env.GIT_OBJECT_DIRECTORY;
+delete process.env.GIT_COMMON_DIR;
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

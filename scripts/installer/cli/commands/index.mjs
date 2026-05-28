@@ -112,7 +112,13 @@ function nowIso() {
 
 export function getRepoCommit(repoRoot) {
   try {
-    return execSync("git rev-parse HEAD", { cwd: repoRoot, stdio: ["ignore", "pipe", "ignore"] })
+    const env = { ...process.env };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    delete env.GIT_INDEX_FILE;
+    delete env.GIT_OBJECT_DIRECTORY;
+    delete env.GIT_COMMON_DIR;
+    return execSync("git rev-parse HEAD", { cwd: repoRoot, env, stdio: ["ignore", "pipe", "ignore"] })
       .toString()
       .trim() || null;
   } catch {

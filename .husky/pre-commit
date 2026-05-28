@@ -4,5 +4,14 @@
 # lint:manifest / lint:drift only apply when a downstream product wires
 # them up — they are not run here. lint:release-sync IS repo-level (it
 # guards package.json version == newest docs/release-notes/v*.md).
+#
+# Harness hardening: husky exports git env vars (GIT_DIR, GIT_WORK_TREE,
+# etc.) for the hook itself; without scrubbing these the spawned `npm
+# test` would inherit them and any test that does `execSync("git
+# rev-parse HEAD", { cwd: <non-git-dir> })` would honor GIT_DIR and
+# return the parent worktree's HEAD instead of the contract-required
+# null. Particularly bites parallel git-worktree builders sharing one
+# .git/refs/heads namespace.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 npm run --silent lint:release-sync
 npm test --silent
