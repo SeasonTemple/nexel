@@ -105,10 +105,37 @@ rotatable signing key is introduced (Option 2 from ADR-0013's CI gap
 section is explicitly rejected). The marker file format
 (`tag=` / `commit=` / `blessed_at=`) is unchanged from ADR-0013.
 
-Branch protection on tag refs would be a complementary defense (it
-prevents the CI workflow from being bypassed by a direct push that
-disables the `review-gate` job dependency), but it lives in GitHub repo
-settings, not in code. It is a deferred ADR-0018 follow-up.
+**Phase 4 P1 (review framing fix).** The actual workflow-mutation bypass
+threat is not addressed by branch protection on **tag refs** — an attacker
+with push access to `main` can simply edit `.github/workflows/release.yml`
+to remove `needs: review-gate` (or weaken the job), then push the tag
+from that commit. The CI workflow used is the one at the tag's commit, so
+weakening it is in-band.
+
+The relevant mitigations are therefore:
+
+1. **CODEOWNERS on `.github/workflows/**`** — require named reviewers on
+   workflow-file changes so a workflow weakening cannot land via direct
+   push.
+2. **Required PR review on `main`** — branch protection requiring at least
+   one approving review on `main` blocks the direct-push variant entirely.
+3. **Workflow ruleset / branch protection on `main`** — bundles 2 + 3 plus
+   linear history etc.
+
+Tag-ref protection alone (rejecting tag pushes by non-maintainers) is
+weaker than the above: a maintainer who is also the attacker simply pushes
+the tag themselves. It is **not** a substitute for CODEOWNERS on the
+workflow file.
+
+These mitigations live in GitHub repo settings (CODEOWNERS file + branch
+protection rules), not in code, and are a deferred ADR-0018 follow-up.
+
+The commit-message bypass scan in `review-gate` is **defense-in-depth
+only**: it catches self-incriminating commits where the author wrote
+`--no-verify` or `HUSKY=0` in their own message. A bypass that does not
+advertise itself (a silent `git push --no-verify` from a workstation,
+leaving no string in the commit text) is not detected by the scan. The
+marker-SHA binding remains the primary enforcement.
 
 ## Guardrails
 
