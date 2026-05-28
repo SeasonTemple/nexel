@@ -9,9 +9,68 @@ permissions:
   contents: write
 
 jobs:
+  # ADR-0018: server-side equivalent of the local pre-push review gate.
+  # The bless marker at `.nexel/release-blessed-<tag>` is gitignored
+  # (ADR-0008) and cannot reach the CI runner via `actions/checkout`, so
+  # we re-derive the gate by re-running the deterministic portions of the
+  # release-time review (`npm test`, `npm run release:preflight`,
+  # `npm run lint:release-sync`) and refusing to advance to the publish
+  # job if any commit in the tag's history advertises a hook bypass.
+  # On success, this job sets the `blessed` output, which the `release`
+  # job consumes via `needs.review-gate.outputs.blessed == 'true'` and
+  # surfaces to `verify-release-tag.mjs` via `NEXEL_CI_BLESSED=true`.
+  review-gate:
+    name: ADR-0013 release-time review gate
+    runs-on: ubuntu-latest
+    outputs:
+      blessed: ${{ steps.gate.outputs.blessed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Re-run deterministic review checks
+        id: gate
+        run: |
+          set -euo pipefail
+          npm test
+          npm run release:preflight
+          npm run lint:release-sync
+          # Reject any commit since the previous tag whose message advertises
+          # a local hook bypass — those are exactly the escape hatches
+          # ADR-0013 documents but does not want silently shipped.
+          prev_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || echo "")"
+          if [ -n "$prev_tag" ]; then
+            range="${prev_tag}..${GITHUB_REF_NAME}"
+          else
+            range="HEAD~20..HEAD"
+          fi
+          if git log --format=%B "$range" | grep -Ei "no-verify|HUSKY=0|core\.hooksPath=/dev/null"; then
+            echo "review-gate: commit message in ${range} advertises a hook bypass; refusing to bless." >&2
+            exit 1
+          fi
+          echo "blessed=true" >> "$GITHUB_OUTPUT"
+
   release:
     name: Build and publish release
+    needs: review-gate
+    if: needs.review-gate.outputs.blessed == 'true'
     runs-on: ubuntu-latest
+    env:
+      # ADR-0018: consumed by `scripts/verify-release-tag.mjs` as proof
+      # that the server-side review-gate job ran and passed. The marker
+      # file is gitignored, so this env var is the CI-side transport.
+      NEXEL_CI_BLESSED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v5

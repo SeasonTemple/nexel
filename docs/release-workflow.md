@@ -75,6 +75,41 @@ assets manually from a local checkout except as an emergency repair.
    nexel-X.Y.Z.tgz.sha256
    ```
 
+## CI release flow (ADR-0018)
+
+The local `pre-push` hook and the bless marker at
+`.nexel/release-blessed-<tag>` are the **maintainer-machine transport**
+for the ADR-0013 review gate. A fresh CI runner does not have either:
+git does not invoke `.husky/` hooks during workflow steps, and `.nexel/`
+is gitignored (ADR-0008) so the marker cannot reach the runner via
+`actions/checkout`.
+
+The CI transport is the `review-gate` job in
+`.github/workflows/release.yml`. When a `v*.*.*` tag is pushed:
+
+1. `review-gate` re-runs the deterministic portions of the release-time
+   review (`npm test`, `npm run release:preflight`,
+   `npm run lint:release-sync`) and refuses to advance if any commit
+   message in the tag range advertises a hook bypass
+   (`--no-verify`, `HUSKY=0`, `core.hooksPath=/dev/null`).
+2. On green, `review-gate` emits `blessed=true`. The `release` job gates
+   on `needs.review-gate.outputs.blessed == 'true'` and sets
+   `NEXEL_CI_BLESSED=true` on its env.
+3. `scripts/verify-release-tag.mjs` accepts EITHER a SHA-bound marker
+   (maintainer path: `commit=<sha>` line matches `git rev-parse HEAD^{commit}`)
+   OR the `NEXEL_CI_BLESSED=true` env signal when `GITHUB_ACTIONS=true`.
+   Absent both, it fails closed.
+
+`NEXEL_CI_BLESSED` is a workflow-local env signal, not a secret — no
+rotatable signing key is introduced (Option 2 from ADR-0013's CI gap
+section is explicitly rejected). The marker file format
+(`tag=` / `commit=` / `blessed_at=`) is unchanged from ADR-0013.
+
+Branch protection on tag refs would be a complementary defense (it
+prevents the CI workflow from being bypassed by a direct push that
+disables the `review-gate` job dependency), but it lives in GitHub repo
+settings, not in code. It is a deferred ADR-0018 follow-up.
+
 ## Guardrails
 
 - `CI` runs on `main` and pull requests: `npm ci`, `npm test`, and
