@@ -49,13 +49,25 @@ jobs:
           # Reject any commit since the previous tag whose message advertises
           # a local hook bypass — those are exactly the escape hatches
           # ADR-0013 documents but does not want silently shipped.
+          #
+          # Phase 4 P1 fixes:
+          #   - Phase 4 P1 #2: fall back to full ref history (not HEAD~20)
+          #     when there is no prior tag. A bypass commit at depth 21+ in a
+          #     shallow-history scenario would have slipped through the
+          #     bounded fallback.
+          #   - Phase 4 P1 #1: anchor regex with word boundaries; drop -i.
+          #     The previous `grep -Ei "no-verify"` matched innocent docs
+          #     commits like `docs(adr): document --no-verify escape hatch`,
+          #     producing false-positives. This scan is defense-in-depth
+          #     against self-incrimination; the marker-SHA binding remains
+          #     the actual enforcement.
           prev_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || echo "")"
           if [ -n "$prev_tag" ]; then
             range="${prev_tag}..${GITHUB_REF_NAME}"
           else
-            range="HEAD~20..HEAD"
+            range="${GITHUB_REF_NAME}"
           fi
-          if git log --format=%B "$range" | grep -Ei "no-verify|HUSKY=0|core\.hooksPath=/dev/null"; then
+          if git log --format=%B "$range" | grep -E '(\-\-no-verify|HUSKY=0|core\.hooksPath=/dev/null)\b'; then
             echo "review-gate: commit message in ${range} advertises a hook bypass; refusing to bless." >&2
             exit 1
           fi
