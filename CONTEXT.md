@@ -36,7 +36,11 @@ _Avoid_: Manifest field, asset declaration
 
 **Absorption**:
 Pulling a *kernel-level* (product-agnostic) evolution back from the more-evolved downstream fork (netops-agent-skills) into this OSS kernel. Product-specific downstream content is explicitly never absorbed.
-_Avoid_: merge, sync, port
+_Avoid_: merge, sync, port, vendor (vendor is the **outbound** counterpart — see **Vendoring**)
+
+**Vendoring**:
+A downstream product (not the kernel) pulling a community / sibling skill into its own asset tree as a managed dependency, with continuing provenance tracking. Outbound + downstream-scoped — the *opposite direction* of **Absorption**. Kernel is unaware; vendoring lives in the `@nexel/vendor` sister package (when that ships) or in product-private tooling.
+_Avoid_: absorb, import, port, copy
 
 ### Release & contract
 
@@ -58,6 +62,7 @@ _Avoid_: the release process (overloaded with the lint)
 - An **Adapter** maps and transforms **Asset**s; a **Manifest** declares which **Asset**s exist
 - **Skill Metadata** annotates a skill that is already visible through the **Manifest**
 - A **Plugin Runtime** configures the host CLI after files are available; it is not part of the **Adapter** SPI
+- **Absorption** and **Vendoring** are opposite directions of skill / capability flow; never overloaded
 - A **Public API contract** begins only at the first **Published baseline**; until then there is none
 - The **Release model** is git-tag/vendor, so `lint-release-sync` enforces version↔release-note (registry-agnostic), not npm state
 
