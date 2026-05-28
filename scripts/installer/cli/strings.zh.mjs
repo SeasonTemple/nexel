@@ -37,6 +37,7 @@ export const strings = Object.freeze({
   export                     将已安装选择集以 JSON 输出到 stdout
   import                     从 stdin 读取选择集 JSON 并安装(配合 export)
   activate                   将 ambient context fence 写入 CLAUDE.md / AGENTS.md
+  deactivate                 从 CLAUDE.md / AGENTS.md 移除本产品的 ambient context fence
   validate <path/SKILL.md>   lint 单个 SKILL.md frontmatter,不扫描整个 repo
   scaffold                   按 ProductConfig 生成三平台 plugin 布局
                              (仅当 createCli({enablePluginScaffolder: true}))
@@ -324,6 +325,36 @@ JSON envelope 中每个 adapter 条目: { adapter, status, code?, details }。
   ${binName} activate --scope=project --json
   ${binName} activate --target=claude --dry-run
   ${binName} activate --target=opencode    # exit 1 + ERR_ACTIVATE_OPENCODE_REFUSED
+
+运行 '${binName} help' 查看完整参考。
+`,
+      deactivate: ({ binName }) => `${binName} deactivate — 从 CLAUDE.md / AGENTS.md 移除本产品的 ambient context fence
+
+用法:
+  ${binName} deactivate [--agent <id>] [--scope user|project] [flags]
+
+Flags:
+  --agent, -a <id>      claude | codex | opencode (逗号分隔或重复)
+                        默认: claude,codex。--agent=opencode 会被拒绝 ——
+                        OpenCode 生命周期由 opencode-plugin 运行时入口托管,
+                        不经此 verb。
+                        --target 作 deprecated alias 保留, 新脚本请用 --agent。
+  --scope <user|project>  user → ~/.claude/CLAUDE.md + ~/.codex/AGENTS.md
+                          project → ./CLAUDE.md + ./AGENTS.md (默认)
+  --dry-run             按 adapter 报告 would-deactivate；不实际写文件
+  --json                stdout 输出机器可读 envelope
+
+JSON envelope 中每个 adapter 条目: { adapter, status, code?, details }。
+状态值: deactivated | would-deactivate | refused | failed。
+
+仅移除本产品写入的 fence (activate 的反向操作); 同一 host file 中其它产品的
+fence 字节相同地保留。幂等: 第二次 deactivate 返回 { action: "noop",
+changed: false }。拒绝写入符号链接目标文件。
+
+示例:
+  ${binName} deactivate --scope=project --json
+  ${binName} deactivate --agent=claude --dry-run
+  ${binName} deactivate --target=opencode    # exit 1 + ERR_DEACTIVATE_OPENCODE_REFUSED
 
 运行 '${binName} help' 查看完整参考。
 `,

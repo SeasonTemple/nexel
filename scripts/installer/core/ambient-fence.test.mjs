@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { writeAmbientFence, hasAmbientFence } from "./ambient-fence.mjs";
+import { writeAmbientFence, hasAmbientFence, removeAmbientFence } from "./ambient-fence.mjs";
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "nexel-ambient-fence-"));
@@ -467,4 +467,141 @@ test("throws TypeError on missing or invalid required arguments", () => {
   assert.throws(() => writeAmbientFence({ productName: "alpha", contentBlock: "body" }), TypeError);
   assert.throws(() => writeAmbientFence({ targetPath: "/tmp/x.md", contentBlock: "body" }), TypeError);
   assert.throws(() => writeAmbientFence({ targetPath: "/tmp/x.md", productName: "alpha", contentBlock: 42 }), TypeError);
+});
+
+// ---------- removeAmbientFence (ADR-0017 / v0.9.0) ----------
+
+test("removeAmbientFence removes only THIS product's fence, preserving siblings byte-identically", () => {
+  // Multi-product isolation invariant (INTERLOCK LOCK 1): exact-invert
+  // per-product removal MUST NOT touch fences belonging to other products
+  // sharing the same host file. Companion to the writeAmbientFence
+  // preservation witness at :134.
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    // Two real managed fences laid down via the writer so the managed-header
+    // sentinel is present on each (the exact bytes user hosts will see).
+    writeAmbientFence({ targetPath: target, productName: "acme", contentBlock: "acme body" });
+    writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "alpha body" });
+    const acmeFenceText = fenceFor("acme", "acme body");
+    const before = fs.readFileSync(target, "utf8");
+    assert.ok(before.includes(acmeFenceText), "acme fence written");
+    assert.ok(before.includes(fenceFor("alpha", "alpha body")), "alpha fence written");
+
+    const result = removeAmbientFence({ targetPath: target, productName: "alpha" });
+    assert.equal(result.action, "removed");
+    assert.equal(result.changed, true);
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes(acmeFenceText), "acme fence preserved byte-identically");
+    assert.ok(!after.includes("alpha body"), "alpha content fully removed");
+    assert.ok(!after.includes("<!-- nexel:alpha:begin -->"), "alpha begin marker removed");
+    assert.ok(!after.includes("<!-- nexel:alpha:end -->"), "alpha end marker removed");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence returns noop on missing host file", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md"); // never created
+    const result = removeAmbientFence({ targetPath: target, productName: "alpha" });
+    assert.equal(result.action, "noop");
+    assert.equal(result.changed, false);
+    assert.ok(typeof result.reason === "string" && result.reason.length > 0);
+    assert.equal(fs.existsSync(target), false, "missing file remains absent (no side-effect creation)");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence returns noop on file without this product's fence (different product fence present)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    writeAmbientFence({ targetPath: target, productName: "other", contentBlock: "other body" });
+    const before = fs.readFileSync(target, "utf8");
+
+    const result = removeAmbientFence({ targetPath: target, productName: "alpha" });
+    assert.equal(result.action, "noop");
+    assert.equal(result.changed, false);
+    assert.equal(result.reason, "no fence for this product");
+    // Other product's content byte-identical.
+    assert.equal(fs.readFileSync(target, "utf8"), before);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence refuses target-symlink (adv-004 parity)", () => {
+  const dir = makeTempDir();
+  try {
+    const realTarget = path.join(dir, "real.md");
+    writeAmbientFence({ targetPath: realTarget, productName: "alpha", contentBlock: "body" });
+    const realBefore = fs.readFileSync(realTarget, "utf8");
+    const symlink = path.join(dir, "CLAUDE.md");
+    try {
+      fs.symlinkSync(realTarget, symlink);
+    } catch (e) {
+      if (e.code === "EPERM" || e.code === "EACCES") return;
+      throw e;
+    }
+    assert.throws(
+      () => removeAmbientFence({ targetPath: symlink, productName: "alpha" }),
+      /symlink/i,
+    );
+    // Real target unchanged — defense prevented mutation through the link.
+    assert.equal(fs.readFileSync(realTarget, "utf8"), realBefore);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence refuses lock-symlink (adv-r5-C parity)", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "body" });
+    const lockPath = `${target}.lock`;
+    const decoyTarget = path.join(dir, "decoy");
+    fs.writeFileSync(decoyTarget, "irrelevant");
+    try {
+      fs.symlinkSync(decoyTarget, lockPath);
+    } catch (e) {
+      if (e.code === "EPERM" || e.code === "EACCES") return;
+      throw e;
+    }
+    assert.throws(
+      () => removeAmbientFence({ targetPath: target, productName: "alpha" }),
+      /planted DOS or stale state/i,
+    );
+    // Host file unchanged.
+    assert.ok(fs.readFileSync(target, "utf8").includes("body"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence is idempotent: repeat call returns noop", () => {
+  const dir = makeTempDir();
+  try {
+    const target = path.join(dir, "CLAUDE.md");
+    writeAmbientFence({ targetPath: target, productName: "alpha", contentBlock: "body" });
+    const first = removeAmbientFence({ targetPath: target, productName: "alpha" });
+    assert.equal(first.action, "removed");
+    assert.equal(first.changed, true);
+    const second = removeAmbientFence({ targetPath: target, productName: "alpha" });
+    assert.equal(second.action, "noop");
+    assert.equal(second.changed, false);
+    assert.equal(second.reason, "no fence for this product");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("removeAmbientFence throws TypeError on missing or invalid required arguments", () => {
+  assert.throws(() => removeAmbientFence({ productName: "alpha" }), TypeError);
+  assert.throws(() => removeAmbientFence({ targetPath: "/tmp/x.md" }), TypeError);
+  assert.throws(() => removeAmbientFence({ targetPath: "", productName: "alpha" }), TypeError);
+  assert.throws(() => removeAmbientFence({ targetPath: "/tmp/x.md", productName: "evil name" }), TypeError);
 });
