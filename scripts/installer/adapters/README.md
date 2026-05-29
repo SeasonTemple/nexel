@@ -1,8 +1,10 @@
-# Adapter SPI v1.1
+# Adapter SPI v1.3
 
-Adapters are the pluggable boundary between the installer kernel and a specific Agent CLI (Claude Code, Codex, OpenCode, or any future CLI). This document is the **single source of truth** for the SPI v1.1 contract.
+Adapters are the pluggable boundary between the installer kernel and a specific Agent CLI (Claude Code, Codex, OpenCode, or any future CLI). This document is the **single source of truth** for the SPI v1.3 contract.
 
 **v1.1 (additive)** — adds the optional `transformAssetContent` hook for per-CLI content rewriting (e.g. frontmatter translation). Identity default; existing adapters work unchanged.
+**v1.2 (additive)** — widens `pluginInstallInstructions` to receive `productConfig` (old `() => string` adapters stay forward-compatible). See ADR-0010.
+**v1.3 (additive)** — adds the optional `contentPipeline` (ordered, stackable content transforms). A declared single `transformAssetContent` auto-promotes to a 1-stage pipeline, so existing adapters work unchanged. See ADR-0020.
 
 External adapter authors implement the required exports below, write zero-effect import-time code, and pass their module to `createAdapterRegistry([...adapters])` when constructing a CLI via `createCli({ adapters, productConfig })`.
 
@@ -17,7 +19,7 @@ Every adapter **must** export these. `createAdapterRegistry` throws `AdapterErro
 | `detectTargetRoot` | `({ override, env }) => string` | Compute the absolute path where this adapter's CLI stores skills/agents/rules. Honor `override` (explicit `--target`) first, then env-var overrides (e.g., `CLAUDE_HOME`), then sensible OS default. |
 | `detectStatus` | `({ override, env }) => StatusObject` | Probe the local environment. Return shape: `{ id, displayName, supportsDirect, targetRoot, exists, writable, cliBinary, cliPath, cliPresent, cliInstallUrl, notes }`. |
 
-## Optional exports (seven fields with kernel defaults)
+## Optional exports (nine fields with kernel defaults)
 
 If omitted, `createAdapterRegistry` injects the default. Adapters override only when they have specific behavior.
 
@@ -29,7 +31,29 @@ If omitted, `createAdapterRegistry` injects the default. Adapters override only 
 | `supportsDirect` | `false` | Set `true` if the CLI tolerates third-party files being dropped into its `targetRoot` (vs requiring a plugin-marketplace install). |
 | `cliBinary` / `cliInstallUrl` | `""` / `""` | Provide so doctor / install can detect whether the agent CLI is on PATH and suggest install URL when not. |
 | `doctorProbes({ targetRoot, env, productConfig })` | `() => []` | Return adapter-specific health checks as `Array<{ name, ok, detail }>`. Used by `doctor` verb output alongside generic kernel checks (target writable, state schema valid, etc.). |
-| `transformAssetContent(asset, body)` *(v1.1)* | `(asset, body) => body` (identity, returns the **input Buffer unchanged** — reference equality is observed by the kernel's `transformed` flag) | When the target CLI's on-disk shape diverges from the source. Receives `{ assetType, id, sourceRelPath }` and a UTF-8 `Buffer`; must return a `Buffer`. MUST be pure (no env reads, no IO). A throw or non-Buffer return surfaces as `AdapterError(ERR_TRANSFORM_FAILED)`. See `adapters/opencode.mjs` (Claude→OpenCode agent frontmatter) and ADR-0002. |
+| `transformAssetContent(asset, body)` *(v1.1)* | `(asset, body) => body` (identity, returns the **input Buffer unchanged** — reference equality is observed by the kernel's `transformed` flag) | When the target CLI's on-disk shape diverges from the source. Receives `{ assetType, id, sourceRelPath }` and a UTF-8 `Buffer`; must return a `Buffer`. MUST be pure (no env reads, no IO). A throw or non-Buffer return surfaces as `AdapterError(ERR_TRANSFORM_FAILED)`. See `adapters/opencode.mjs` (Claude→OpenCode agent frontmatter) and ADR-0002. **Declaring this AND a non-empty `contentPipeline` is a construction-time error** — use one or the other. |
+| `contentPipeline` *(v1.3)* | `[]` (frozen empty — identity) | Ordered, stackable content transforms: `Array<{ id, run }>`. Use when you need to compose more than one transform. See the `contentPipeline` section below. |
+
+## `contentPipeline` *(v1.3)*
+
+An ordered array of stages, each `{ id: string, run: (asset, body: Buffer) => Buffer }`. Stages run in declared order, threading the Buffer from one stage's output into the next stage's input. Each `run` carries the **exact** `transformAssetContent` contract: pure (no env reads, no IO), and identity stages return the **input Buffer by reference** so the kernel's `transformed` flag (reference equality) stays correct.
+
+```js
+export const contentPipeline = [
+  { id: "prefix-rewrite", run: (asset, body) => /* return a new Buffer */ },
+  { id: "annotate",       run: (asset, body) => /* return a new Buffer */ },
+];
+```
+
+Rules:
+
+- **Auto-promotion.** Declaring a single `transformAssetContent` is equivalent to a 1-stage pipeline — the kernel resolves it to `[{ id: "transformAssetContent", run: <hook> }]` at registry build. Existing v1.1/v1.2 adapters need no change.
+- **Mutual exclusion.** Declaring a non-empty `contentPipeline` AND a `transformAssetContent` hook is a construction-time error (`AdapterError(ERR_ADAPTER_INVALID)`). Pick one.
+- **Read-only Buffer.** A stage's `run` receives the threaded Buffer as **read-only**. Return a new Buffer (or the input by reference for identity). In-place mutation that returns the same reference is undefined behavior: it defeats the `transformed` flag and can desync staged bytes from the recorded hash.
+- **Sync only.** Stages are synchronous. The staging path is synchronous end to end; async stages are out of scope for v1.3.
+- **Stage `id`s** must be non-empty and unique within the pipeline. A failing stage surfaces `AdapterError(ERR_TRANSFORM_FAILED)` with `.details.stageId` naming the stage.
+
+Out of scope for v1.3 (deliberate, may arrive in a later minor): `when` phase tagging (`plan` / `stage` / `lint`), async stages, lint-as-a-stage, and a self-improve hook. See ADR-0020.
 
 ## Import side-effect ban
 
@@ -117,7 +141,7 @@ export function pluginInstallInstructions() {
 
 ## SPI evolution policy
 
-- **Minor versions** add new **optional** fields only. Existing adapters continue to work without changes; the kernel provides defaults. (v1.1 added `transformAssetContent`.)
+- **Minor versions** add new **optional** fields only. Existing adapters continue to work without changes; the kernel provides defaults. (v1.1 added `transformAssetContent`; v1.2 widened `pluginInstallInstructions`; v1.3 added `contentPipeline`.)
 - **Major versions** may add new **required** fields. Existing adapters must update.
 - ERR codes referenced here (`ERR_ADAPTER_INVALID`, `ERR_ADAPTER_ID_COLLISION`, `ERR_NO_ADAPTERS`, `ERR_UNKNOWN_ADAPTER`, `ERR_DIRECT_UNSUPPORTED`, `ERR_AGENT_CLI_MISSING`, `ERR_TRANSFORM_FAILED`) are part of the public stability contract — their string values do not change between minor versions.
 
