@@ -38,7 +38,7 @@ import { hashBytes, stageWrite } from "./filesystem.mjs";
  *
  * @param {Object}  params
  * @param {{assetType:string,id:string,sourceRelPath?:string,sourceAbs:string,sourceBuf?:Buffer}} params.asset
- * @param {Object?} params.adapter      adapter object (or undefined for identity); only `id` + `transformAssetContent` consulted
+ * @param {Object?} params.adapter      adapter object (or undefined for identity); only `id` + resolved `contentPipeline` consulted
  * @param {string}  params.stagingDir   absolute staging dir (caller created via makeStagingDir)
  * @param {string}  params.targetRel    relative path the staged bytes will promote to
  * @returns {{sha256:string,algo:string,normalization:string,bytes:number,transformed:boolean}}
@@ -46,7 +46,7 @@ import { hashBytes, stageWrite } from "./filesystem.mjs";
 export function stageAsset({ asset, adapter, stagingDir, targetRel }) {
   const { resultBuf, transformed } = applyAdapterTransform(
     asset,
-    adapter?.transformAssetContent,
+    adapter?.contentPipeline,
     { adapterId: adapter?.id ?? null, stage: "stage" }
   );
   const hash = hashBytes(resultBuf, { extension: path.extname(asset.sourceAbs) });
@@ -75,7 +75,7 @@ export function stageAsset({ asset, adapter, stagingDir, targetRel }) {
 export function hashTransformed({ asset, adapter, stage }) {
   const { resultBuf, transformed } = applyAdapterTransform(
     asset,
-    adapter?.transformAssetContent,
+    adapter?.contentPipeline,
     { adapterId: adapter?.id ?? null, stage }
   );
   const hash = hashBytes(resultBuf, { extension: path.extname(asset.sourceAbs) });
