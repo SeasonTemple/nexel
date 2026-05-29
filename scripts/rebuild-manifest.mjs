@@ -87,6 +87,14 @@ export function deriveManifest(existing, { skillsDirAbs, skillsDirRel, idPrefix 
       errors.push({ severity: "error", message: `${dirname}/SKILL.md: missing/invalid frontmatter "name"` });
       continue;
     }
+    // `__proto__` as an object key is the one name that breaks bracket
+    // assignment (it targets the prototype setter, not an own property), so a
+    // skill literally named "__proto__" would be silently lost. Refuse it —
+    // a generator must not persist garbage.
+    if (name === "__proto__") {
+      errors.push({ severity: "error", message: `${dirname}/SKILL.md: "__proto__" is a reserved name` });
+      continue;
+    }
     if (idPrefix && name !== `${idPrefix}:${dirname}`) {
       errors.push({ severity: "error", message: `${dirname}/SKILL.md: name "${name}" does not match expected "${idPrefix}:${dirname}"` });
       continue;
@@ -101,7 +109,7 @@ export function deriveManifest(existing, { skillsDirAbs, skillsDirRel, idPrefix 
     }
     // description is only consumed when SEEDING a new skill; an existing skill's
     // authored manifest description is preserved regardless.
-    const isNew = !(name in existingSkills);
+    const isNew = !Object.hasOwn(existingSkills, name);
     if (isNew && (typeof description !== "string" || description.trim() === "")) {
       errors.push({ severity: "error", message: `${dirname}/SKILL.md: new skill needs a non-empty frontmatter "description" to seed the manifest` });
       continue;
@@ -117,14 +125,14 @@ export function deriveManifest(existing, { skillsDirAbs, skillsDirRel, idPrefix 
   for (const id of Object.keys(existingSkills)) {
     if (diskById.has(id)) orderedIds.push(id);
   }
-  const newIds = [...diskById.keys()].filter((id) => !(id in existingSkills)).sort(codepointCompare);
+  const newIds = [...diskById.keys()].filter((id) => !Object.hasOwn(existingSkills, id)).sort(codepointCompare);
   orderedIds.push(...newIds);
 
   // 4. Build canonical skill entries.
   const skills = {};
   for (const id of orderedIds) {
     const d = diskById.get(id);
-    const prev = existingSkills[id] || {};
+    const prev = Object.hasOwn(existingSkills, id) ? existingSkills[id] : {};
     const entry = {
       id,
       dirname: d.dirname,
@@ -132,7 +140,7 @@ export function deriveManifest(existing, { skillsDirAbs, skillsDirRel, idPrefix 
       category: d.category,
     };
     if ("profile" in prev) entry.profile = prev.profile;
-    else if (!(id in existingSkills)) entry.profile = "standalone";
+    else if (!Object.hasOwn(existingSkills, id)) entry.profile = "standalone";
     entry.description = "description" in prev ? prev.description : d.description;
     if ("dependencies" in prev) entry.dependencies = prev.dependencies;
     // Preserve any other authored fields verbatim, after the canonical ones.

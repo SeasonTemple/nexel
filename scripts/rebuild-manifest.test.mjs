@@ -273,6 +273,25 @@ test("malformed frontmatter (missing name) is a hard error", () => {
   assert.ok(errors.some((e) => /missing\/invalid frontmatter "name"/.test(e.message)));
 });
 
+// --- prototype-chain key hardening -----------------------------------------
+
+test("skill named __proto__ is a hard error (never silently dropped)", () => {
+  const { skillsDir } = makeRepo([{ dirname: "p", name: "__proto__" }], {});
+  const { manifest, errors } = deriveManifest({ schemaVersion: 1, skills: {} }, DERIVE_OPTS(skillsDir));
+  assert.equal(manifest, null);
+  assert.ok(errors.some((e) => /"__proto__" is a reserved name/.test(e.message)));
+});
+
+test("skill named constructor (a prototype member) is classified as NEW, not silently dropped", () => {
+  // `in` would report "constructor" as already-present on an empty object;
+  // Object.hasOwn does not. The skill must appear in the output.
+  const { skillsDir } = makeRepo([{ dirname: "c", name: "constructor", description: "Ctor skill." }], {});
+  const { manifest, errors } = deriveManifest({ schemaVersion: 1, skills: {} }, DERIVE_OPTS(skillsDir));
+  assert.deepEqual(errors, []);
+  assert.ok(Object.hasOwn(manifest.skills, "constructor"));
+  assert.equal(manifest.skills["constructor"].profile, "standalone");
+});
+
 // --- main() spawn E2E ------------------------------------------------------
 
 function runBin(args) {
