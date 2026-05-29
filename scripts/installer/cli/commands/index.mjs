@@ -875,7 +875,7 @@ export function agentsCommand({ repoRoot, env = process.env } = {}) {
  *  - lock file age (stale lock detection)
  *  - per-managed-file existence + hash match (sampled — limit cost)
  */
-export function doctorCommand({ repoRoot, adapterId, target, productConfig, env = process.env } = {}) {
+export function doctorCommand({ repoRoot, adapterId, target, productConfig, env = process.env, getAdapterFn = getAdapter } = {}) {
   const adapters = applyProfileToAdapters(listAdapterStatus({ env }), env);
   const filtered = (adapterId
     ? adapters.filter((a) => a.id === adapterId)
@@ -999,6 +999,30 @@ export function doctorCommand({ repoRoot, adapterId, target, productConfig, env 
         if (tampered.length) parts.push(`${tampered.length} modified`);
         add("managed-files", false, `${parts.join(", ")}${sampledNote}; run 'repair --agent ${a.id}' to reconcile`);
       }
+    }
+
+    // Adapter-contributed health probes (SPI `doctorProbes`). Each adapter
+    // may return extra `{name, ok, detail}` checks the kernel can't know
+    // about (e.g. host-CLI plugin-runtime config presence). Folds them in
+    // alongside the built-in checks. Adapters that don't define probes fall
+    // through to the SPI `() => []` default and add nothing. A throwing or
+    // malformed probe is surfaced as a failed check rather than crashing the
+    // whole doctor run.
+    try {
+      const probes = getAdapterFn(a.id).doctorProbes({ targetRoot: a.targetRoot, env, productConfig });
+      if (!Array.isArray(probes)) {
+        add("adapter-probes", false, `adapter ${a.id} doctorProbes did not return an array`);
+      } else {
+        for (const p of probes) {
+          if (p && typeof p.name === "string") {
+            add(p.name, !!p.ok, p.detail);
+          } else {
+            add("adapter-probes", false, `adapter ${a.id} returned a malformed probe entry`);
+          }
+        }
+      }
+    } catch (e) {
+      add("adapter-probes", false, `adapter ${a.id} doctorProbes threw: ${e.message || String(e)}`);
     }
 
     reports.push(report);
