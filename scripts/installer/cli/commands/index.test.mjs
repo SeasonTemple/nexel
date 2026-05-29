@@ -168,6 +168,60 @@ test("doctorCommand: returns a structured health report with reports + counts", 
   assert.equal(typeof out.failCount, "number", "failCount is numeric");
 });
 
+test("doctorCommand: built-in adapters add no adapter-probes checks (empty SPI default doesn't pollute)", () => {
+  const out = doctorCommand({ repoRoot: SAMPLE, adapterId: "claude-code", env: process.env });
+  const probeChecks = out.reports.flatMap((r) => r.checks).filter((c) => c.name === "adapter-probes");
+  assert.equal(probeChecks.length, 0, "no built-in adapter defines doctorProbes today");
+});
+
+test("doctorCommand: folds a passing adapter probe into the report", () => {
+  const fakeAdapter = {
+    doctorProbes: ({ targetRoot }) => [{ name: "plugin-config", ok: true, detail: `checked ${targetRoot}` }],
+  };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  const check = out.reports[0].checks.find((c) => c.name === "plugin-config");
+  assert.ok(check, "probe check is present in the report");
+  assert.equal(check.ok, true);
+});
+
+test("doctorCommand: a failing adapter probe flips report.ok to false", () => {
+  const fakeAdapter = {
+    doctorProbes: () => [{ name: "plugin-config", ok: false, detail: "config missing" }],
+  };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  assert.equal(out.reports[0].ok, false, "failing probe propagates to report.ok");
+  assert.equal(out.failCount, 1);
+});
+
+test("doctorCommand: a throwing adapter probe is surfaced as a failed check, not a crash", () => {
+  const fakeAdapter = {
+    doctorProbes: () => { throw new Error("boom"); },
+  };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  const check = out.reports[0].checks.find((c) => c.name === "adapter-probes");
+  assert.ok(check && check.ok === false, "throwing probe yields a failed adapter-probes check");
+  assert.ok(check.detail.includes("boom"), "probe error message is preserved");
+});
+
+test("doctorCommand: a non-array doctorProbes return is surfaced as a failed check", () => {
+  const fakeAdapter = { doctorProbes: () => ({ not: "an array" }) };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  const check = out.reports[0].checks.find((c) => c.name === "adapter-probes");
+  assert.ok(check && check.ok === false, "malformed return yields a failed adapter-probes check");
+});
+
 test("doctorCommand: --target override scopes the health report to the requested sandbox", () => {
   const target = tmp("doctor-target-");
   try {
