@@ -1,6 +1,6 @@
 {
   "name": "sample-product",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Sample worked-example plugin demonstrating nexel's downstream layout.",
   "homepage": "https://github.com/SeasonTemple/nexel",
   "repository": "https://github.com/SeasonTemple/nexel.git",
