@@ -184,6 +184,32 @@ test("architecture: examples/sample-product/bin.mjs only imports the public API 
   );
 });
 
+test("architecture: examples/vendor-tool imports nothing from the kernel (installer/**)", () => {
+  // @nexel/vendor's headline property is "kernel zero changes": the tool logic
+  // AND its example config consume no kernel code at all. Lock that in across
+  // every .mjs in the dir (not just bin/vendor) — the example config is
+  // deliberately self-contained, so a future transitive import into the kernel
+  // (e.g. via another example's ProductConfig) would be a regression caught here.
+  const dir = path.resolve(SCRIPTS_ROOT, "..", "examples", "vendor-tool");
+  if (!fs.existsSync(dir)) return; // example may be relocated later
+  const files = ["bin.mjs", "vendor.mjs", "vendor.config.mjs"]
+    .map((f) => path.join(dir, f))
+    .filter((f) => fs.existsSync(f));
+  const violations = [];
+  for (const file of files) {
+    for (const spec of extractImports(file)) {
+      if (/installer\//.test(spec)) {
+        violations.push(`${path.basename(file)} → ${spec} (vendor-tool must not import the kernel)`);
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `vendor-tool reaches into the kernel:\n  ${violations.join("\n  ")}`
+  );
+});
+
 test("architecture: sample OpenCode plugin imports only the public plugin subpath", () => {
   const file = path.resolve(SCRIPTS_ROOT, "..", "examples", "sample-product", ".opencode", "plugins", "sample-product.js");
   if (!fs.existsSync(file)) return;

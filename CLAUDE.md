@@ -6,7 +6,7 @@ Guidance for Claude Code (and any agent) working in this repo.
 
 `nexel` — an OSS kernel library for managing AI agent skills, agents, and rules across Claude Code, Codex, and OpenCode. The library is product-agnostic; downstream products supply a `ProductConfig` and content, and the kernel handles install / uninstall / update / state tracking / drift detection / planning / etc. (Formerly `skillctl`; renamed per `docs/adr/0007-rename-to-nexel-and-decouple-publish-decision.md`.)
 
-The repo previously hosted Lenovo's internal NetOps team-skills product. The OSS line forked at v0.5.1 of that internal product, dropped all internal content, and restarted at v0.1.0. The internal product line is no longer present in this repository — only the kernel library and a single worked example under `examples/sample-product/`.
+The repo previously hosted Lenovo's internal NetOps team-skills product. The OSS line forked at v0.5.1 of that internal product, dropped all internal content, and restarted at v0.1.0. The internal product line is no longer present in this repository — only the kernel library and the worked examples under `examples/` (`sample-product/`, a full ProductConfig consumer; `vendor-tool/`, a pre-adoption `@nexel/vendor` skill-vendoring scaffold).
 
 ## Bootstrap
 
@@ -30,7 +30,8 @@ nexel/
 │   ├── lint-skills.mjs     # SKILL.md frontmatter linter (with optional --id-prefix)
 │   └── install-husky.mjs   # husky bootstrap helper
 ├── examples/
-│   └── sample-product/     # Canonical worked example: ProductConfig + manifest + content + bin
+│   ├── sample-product/     # Canonical worked example: ProductConfig + manifest + content + bin
+│   └── vendor-tool/        # @nexel/vendor MVP scaffold: declarative skill vendoring (kernel zero-import)
 └── docs/
     ├── adr/                # Architecture Decision Records (one .md per ADR)
     ├── plans/              # Implementation plans (one .md per plan)
