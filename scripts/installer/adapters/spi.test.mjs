@@ -37,7 +37,7 @@ test("SPI_REQUIRED lists the four required fields", () => {
   assert.deepEqual([...SPI_REQUIRED], ["id", "displayName", "detectTargetRoot", "detectStatus"]);
 });
 
-test("SPI_DEFAULTS exposes all eight optional fields with sensible defaults", () => {
+test("SPI_DEFAULTS exposes all nine optional fields with sensible defaults", () => {
   const expectedKeys = [
     "mapTargetPath",
     "supportedAssetTypes",
@@ -47,6 +47,7 @@ test("SPI_DEFAULTS exposes all eight optional fields with sensible defaults", ()
     "cliInstallUrl",
     "doctorProbes",
     "transformAssetContent",
+    "contentPipeline",
   ];
   for (const key of expectedKeys) {
     assert.ok(key in SPI_DEFAULTS, `SPI_DEFAULTS missing ${key}`);
@@ -70,6 +71,79 @@ test("SPI_DEFAULTS exposes all eight optional fields with sensible defaults", ()
   const buf = Buffer.from("x");
   assert.equal(SPI_DEFAULTS.transformAssetContent({ assetType: "agent", id: "a" }, buf), buf,
     "identity default must return the SAME Buffer instance (reference equality)");
+  // v1.3: contentPipeline default is the frozen empty array (identity).
+  assert.ok(Array.isArray(SPI_DEFAULTS.contentPipeline));
+  assert.equal(SPI_DEFAULTS.contentPipeline.length, 0);
+  assert.ok(Object.isFrozen(SPI_DEFAULTS.contentPipeline));
+});
+
+// ---- SPI v1.3 contentPipeline: resolution + validation (ADR-0020) ----
+
+test("applyDefaults: no hook, no pipeline → canonical contentPipeline is empty (NOT a 1-stage identity)", () => {
+  const prepared = applyDefaults(makeMinimalAdapter());
+  assert.ok(Array.isArray(prepared.contentPipeline));
+  // Load-bearing: the kernel must NOT auto-promote its own injected identity
+  // default into a spurious 1-stage pipeline. Guards the reference-identity
+  // invariant in applyDefaults (ADR-0020 / doc-review A1).
+  assert.equal(prepared.contentPipeline.length, 0, "no-hook adapter must resolve to an EMPTY pipeline");
+  assert.ok(Object.isFrozen(prepared.contentPipeline), "empty pipeline is frozen");
+});
+
+test("applyDefaults: single transformAssetContent auto-promotes to a 1-stage pipeline", () => {
+  const customXf = (asset, body) => Buffer.concat([body, Buffer.from("!")]);
+  const prepared = applyDefaults(makeMinimalAdapter({ transformAssetContent: customXf }));
+  assert.equal(prepared.contentPipeline.length, 1);
+  assert.equal(prepared.contentPipeline[0].id, "transformAssetContent");
+  assert.equal(prepared.contentPipeline[0].run, customXf, "promoted stage's run is the adapter's hook");
+});
+
+test("applyDefaults: explicit multi-stage contentPipeline is kept verbatim, order preserved", () => {
+  const s1 = { id: "a", run: (asset, body) => body };
+  const s2 = { id: "b", run: (asset, body) => body };
+  const prepared = applyDefaults(makeMinimalAdapter({ contentPipeline: [s1, s2] }));
+  assert.equal(prepared.contentPipeline.length, 2);
+  assert.deepEqual(prepared.contentPipeline.map((s) => s.id), ["a", "b"]);
+});
+
+test("validateAdapter: declaring both contentPipeline and transformAssetContent throws ERR_ADAPTER_INVALID", () => {
+  const bad = makeMinimalAdapter({
+    contentPipeline: [{ id: "s", run: (a, b) => b }],
+    transformAssetContent: (a, b) => b,
+  });
+  assert.throws(
+    () => validateAdapter(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID"
+      && /contentPipeline \+ transformAssetContent/.test(e.message),
+    "must name both fields in the mutual-exclusion error",
+  );
+});
+
+test("validateAdapter: non-array contentPipeline throws ERR_ADAPTER_INVALID", () => {
+  const bad = makeMinimalAdapter({ contentPipeline: { not: "an array" } });
+  assert.throws(() => validateAdapter(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID" && /must be an array/.test(e.message));
+});
+
+test("validateAdapter: stage with empty/missing id or non-function run throws ERR_ADAPTER_INVALID", () => {
+  const bad = makeMinimalAdapter({
+    contentPipeline: [{ id: "", run: (a, b) => b }, { id: "ok", run: "nope" }],
+  });
+  assert.throws(() => validateAdapter(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID"
+      && /contentPipeline\[0\]\.id/.test(e.message) && /contentPipeline\[1\]\.run/.test(e.message));
+});
+
+test("validateAdapter: duplicate stage id within one pipeline throws ERR_ADAPTER_INVALID", () => {
+  const bad = makeMinimalAdapter({
+    contentPipeline: [{ id: "dup", run: (a, b) => b }, { id: "dup", run: (a, b) => b }],
+  });
+  assert.throws(() => validateAdapter(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID" && /duplicate stage id "dup"/.test(e.message));
+});
+
+test("validateAdapter: a valid explicit pipeline (no hook) passes", () => {
+  const ok = makeMinimalAdapter({ contentPipeline: [{ id: "x", run: (a, b) => b }] });
+  assert.doesNotThrow(() => validateAdapter(ok));
 });
 
 test("validateAdapter: missing required-4 fields are all reported", () => {

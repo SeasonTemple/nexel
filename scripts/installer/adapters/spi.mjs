@@ -1,4 +1,4 @@
-// Adapter SPI v1.2 contract — single source of truth.
+// Adapter SPI v1.3 contract — single source of truth.
 //
 // Required-4 fields (every adapter must export these):
 //   id            : string         unique identifier
@@ -27,6 +27,19 @@
 //                                  MUST be pure (no env/IO). Identity paths
 //                                  MUST return the input Buffer unchanged
 //                                  (reference-equality is observed).
+//   contentPipeline            : Array<{id, run}>                   (v1.3)
+//                                  Ordered, stackable content transforms.
+//                                  Default []. Each stage's run carries the
+//                                  exact transformAssetContent contract (pure,
+//                                  identity returns input Buffer by reference).
+//                                  Resolved at registry build (applyDefaults):
+//                                  a declared single transformAssetContent
+//                                  auto-promotes to a 1-stage pipeline; an empty
+//                                  pipeline + no hook is identity. Declaring
+//                                  BOTH a non-empty pipeline and a hook is a
+//                                  construction-time error (ERR_ADAPTER_INVALID).
+//                                  Stages are synchronous and receive the
+//                                  threaded Buffer as READ-ONLY. See ADR-0020.
 //
 // SPI evolution policy:
 //   - Minor versions: add NEW optional fields with kernel defaults, OR
@@ -35,7 +48,7 @@
 //     pluginInstallInstructions from () to (productConfig); a v1.1 adapter
 //     that ignores the new arg still satisfies the v1.2 contract).
 //     (v1.1 added transformAssetContent; v1.2 widened
-//     pluginInstallInstructions.)
+//     pluginInstallInstructions; v1.3 added contentPipeline.)
 //   - Major versions: may add new REQUIRED fields. Existing adapters must
 //     update to declare them.
 //   - String values of ERR_ADAPTER_INVALID / ERR_ADAPTER_ID_COLLISION /
@@ -95,6 +108,11 @@ export const SPI_DEFAULTS = Object.freeze({
   // via reference equality. Adapters override only when the target CLI's
   // on-disk shape diverges from the source.
   transformAssetContent: (asset, body) => body,
+  // v1.3 — ordered stackable content transforms. Default is the shared frozen
+  // empty array (identity). applyDefaults resolves the canonical pipeline:
+  // auto-promotes a declared transformAssetContent to a 1-stage pipeline, or
+  // leaves this empty for no-hook adapters. See ADR-0020.
+  contentPipeline: Object.freeze([]),
 });
 
 const OPTIONAL_FIELDS = Object.freeze(Object.keys(SPI_DEFAULTS));
@@ -128,6 +146,43 @@ export function validateAdapter(adapter) {
       malformed.push({ field, reason: "must be a non-empty string" });
     }
   }
+  // SPI v1.3 (ADR-0020): contentPipeline shape + mutual exclusion with
+  // transformAssetContent. Validated on the RAW adapter, before applyDefaults
+  // injects identity defaults — so a present transformAssetContent here is
+  // unambiguously the author's, not the kernel default.
+  if (adapter.contentPipeline !== undefined && adapter.contentPipeline !== null) {
+    const cp = adapter.contentPipeline;
+    if (!Array.isArray(cp)) {
+      malformed.push({ field: "contentPipeline", reason: "must be an array of { id, run } stages" });
+    } else {
+      const seenIds = new Set();
+      cp.forEach((stage, i) => {
+        if (!stage || typeof stage !== "object") {
+          malformed.push({ field: `contentPipeline[${i}]`, reason: "must be a { id, run } object" });
+          return;
+        }
+        if (typeof stage.id !== "string" || stage.id === "") {
+          malformed.push({ field: `contentPipeline[${i}].id`, reason: "must be a non-empty string" });
+        } else if (seenIds.has(stage.id)) {
+          malformed.push({ field: `contentPipeline[${i}].id`, reason: `duplicate stage id "${stage.id}"` });
+        } else {
+          seenIds.add(stage.id);
+        }
+        if (typeof stage.run !== "function") {
+          malformed.push({ field: `contentPipeline[${i}].run`, reason: "must be a function" });
+        }
+      });
+      // Fail loud when both a non-empty pipeline AND a hook are declared: a
+      // single hook auto-promotes to a 1-stage pipeline, so declaring both is
+      // almost certainly a half-migration or mistake.
+      if (cp.length > 0 && typeof adapter.transformAssetContent === "function") {
+        malformed.push({
+          field: "contentPipeline + transformAssetContent",
+          reason: "declare one or the other, not both (a single transformAssetContent auto-promotes to a 1-stage pipeline)",
+        });
+      }
+    }
+  }
   if (missing.length > 0 || malformed.length > 0) {
     const parts = [];
     if (adapter.id || adapter.displayName) {
@@ -155,6 +210,27 @@ export function applyDefaults(adapter) {
     if (out[field] === undefined || out[field] === null) {
       out[field] = SPI_DEFAULTS[field];
     }
+  }
+  // SPI v1.3 (ADR-0020): resolve the canonical content pipeline. After the fill
+  // loop, out.transformAssetContent is always a function (author's or the
+  // injected identity default) and out.contentPipeline is always an array. The
+  // `!== SPI_DEFAULTS.transformAssetContent` check below is LOAD-BEARING: it is
+  // the sole guard stopping the kernel from auto-promoting its OWN injected
+  // identity default into a spurious 1-stage pipeline, and it works only while
+  // that default is shared by reference. Do NOT make SPI_DEFAULTS.transformAssetContent
+  // a fresh per-call arrow — every no-hook adapter would silently gain a 1-stage
+  // identity pipeline and lose the empty-pipeline / same-Buffer fast path.
+  if (out.contentPipeline.length > 0) {
+    // Author declared an explicit pipeline — keep it verbatim.
+  } else if (out.transformAssetContent !== SPI_DEFAULTS.transformAssetContent) {
+    // Auto-promote the single declared hook to a 1-stage pipeline.
+    out.contentPipeline = Object.freeze([
+      { id: "transformAssetContent", run: out.transformAssetContent },
+    ]);
+  } else {
+    // No hook, no pipeline — canonical identity. Reuse the shared frozen empty
+    // default so every no-hook adapter's empty pipeline is consistently frozen.
+    out.contentPipeline = SPI_DEFAULTS.contentPipeline;
   }
   return out;
 }
