@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 date: 2026-05-29
 type: feat
 origin: docs/adr/0020-spi-v13-content-pipeline.md
