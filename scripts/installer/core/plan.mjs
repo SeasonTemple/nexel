@@ -88,29 +88,37 @@ export function defaultTargetMapping(manifest /*, repoRoot */) {
 }
 
 /**
- * SPI v1.1 content-transform compose primitive (core-internal — NOT
- * re-exported via index.mjs; production callers go through
- * core/stage-asset.mjs, which composes this).
+ * SPI v1.3 content-pipeline fold primitive (core-internal — NOT re-exported
+ * via index.mjs; production callers go through core/stage-asset.mjs, which
+ * composes this).
  *
- * Runs the adapter's `transformAssetContent` hook (or identity when absent)
- * over the asset's source bytes. The `transformed` flag is computed by
- * Buffer reference equality: an identity hook returns the input Buffer
- * unchanged, so `resultBuf === sourceBuf` ⇒ `transformed: false`.
+ * Folds the adapter's resolved canonical `contentPipeline` (an ordered array
+ * of `{ id, run }` stages) over the asset's source bytes, threading the Buffer
+ * stage → stage. The `transformed` flag is computed ONCE by Buffer reference
+ * equality against the ORIGINAL source buffer (never per-stage): an empty
+ * pipeline — or a pipeline whose net result returns the input by reference —
+ * yields `transformed: false`. Stages receive the threaded Buffer as
+ * read-only; in-place mutation that returns the same reference is undefined
+ * behavior that can corrupt the flag and the cross-stage hash invariant.
  *
- * A hook throw or a non-Buffer return surfaces as
+ * A stage throw or a non-Buffer return surfaces as
  * `AdapterError(ERR_TRANSFORM_FAILED)` carrying
- * `.details = { adapterId, assetId, assetType, stage, cause }`. `stage`
- * ("plan" | "stage") is supplied by the caller for provenance and does not
- * fork the error identity.
+ * `.details = { adapterId, assetId, assetType, stage, stageId, cause }`.
+ * `stage` ("plan" | "stage") is the caller-supplied invocation-site provenance;
+ * `stageId` is the failing pipeline stage's `id`. Neither forks the error
+ * identity. (ADR-0020 D4.)
  *
  * @param {{assetType:string,id:string,sourceRelPath?:string,sourceAbs?:string,sourceBuf?:Buffer}} asset
- * @param {((asset:object, body:Buffer)=>Buffer)|undefined} transformFn
+ * @param {Array<{id:string,run:(asset:object,body:Buffer)=>Buffer}>|undefined} pipeline  canonical resolved pipeline (adapter.contentPipeline)
  * @param {{adapterId?:string|null, stage:"plan"|"stage"}} opts
  * @returns {{resultBuf:Buffer, transformed:boolean}}
  */
-export function applyAdapterTransform(asset, transformFn, { adapterId = null, stage } = {}) {
+export function applyAdapterTransform(asset, pipeline, { adapterId = null, stage } = {}) {
   const sourceBuf = asset.sourceBuf ?? fs.readFileSync(asset.sourceAbs);
-  if (typeof transformFn !== "function") {
+  // Identity fast-path covers BOTH undefined/null (no adapter supplied) and a
+  // resolved empty pipeline (no-hook adapter). Returns the source Buffer BY
+  // REFERENCE so reference-equality "transformed" detection holds (ADR-0020 D3).
+  if (!Array.isArray(pipeline) || pipeline.length === 0) {
     return { resultBuf: sourceBuf, transformed: false };
   }
   const hookAsset = {
@@ -118,24 +126,29 @@ export function applyAdapterTransform(asset, transformFn, { adapterId = null, st
     id: asset.id,
     sourceRelPath: asset.sourceRelPath,
   };
-  let resultBuf;
-  try {
-    resultBuf = transformFn(hookAsset, sourceBuf);
-  } catch (cause) {
-    throw new AdapterError(
-      `adapter ${adapterId ?? "(unknown)"} transformAssetContent threw for ${asset.assetType} ${asset.id}`,
-      ERR_TRANSFORM_FAILED,
-      { adapterId, assetId: asset.id, assetType: asset.assetType, stage, cause }
-    );
+  let buf = sourceBuf;
+  for (const stageDef of pipeline) {
+    let out;
+    try {
+      out = stageDef.run(hookAsset, buf);
+    } catch (cause) {
+      throw new AdapterError(
+        `adapter ${adapterId ?? "(unknown)"} contentPipeline stage "${stageDef.id}" threw for ${asset.assetType} ${asset.id}`,
+        ERR_TRANSFORM_FAILED,
+        { adapterId, assetId: asset.id, assetType: asset.assetType, stage, stageId: stageDef.id, cause }
+      );
+    }
+    if (!Buffer.isBuffer(out)) {
+      throw new AdapterError(
+        `adapter ${adapterId ?? "(unknown)"} contentPipeline stage "${stageDef.id}" returned a non-Buffer (${typeof out}) for ${asset.assetType} ${asset.id}`,
+        ERR_TRANSFORM_FAILED,
+        { adapterId, assetId: asset.id, assetType: asset.assetType, stage, stageId: stageDef.id, cause: null }
+      );
+    }
+    buf = out;
   }
-  if (!Buffer.isBuffer(resultBuf)) {
-    throw new AdapterError(
-      `adapter ${adapterId ?? "(unknown)"} transformAssetContent returned a non-Buffer (${typeof resultBuf}) for ${asset.assetType} ${asset.id}`,
-      ERR_TRANSFORM_FAILED,
-      { adapterId, assetId: asset.id, assetType: asset.assetType, stage, cause: null }
-    );
-  }
-  return { resultBuf, transformed: resultBuf !== sourceBuf };
+  // Net change vs the ORIGINAL source buffer — not per-stage.
+  return { resultBuf: buf, transformed: buf !== sourceBuf };
 }
 
 function walkSkillDir(skillDirAbs) {
@@ -171,12 +184,13 @@ export function buildInstallPlan(manifest, selectionIds, options) {
   // Plan-side transformed hash. Composes the in-module applyAdapterTransform
   // + hashBytes (NOT stage-asset.mjs's hashTransformed — that would create a
   // plan.mjs ↔ stage-asset.mjs import cycle; see ADR-0003). Identity when no
-  // adapter / no transformAssetContent, so the recorded sha256 equals what
-  // stageAsset later writes (cross-stage invariant, ADR-0002 D2).
+  // adapter / empty pipeline, so the recorded sha256 equals what stageAsset
+  // later writes (cross-stage invariant, ADR-0002 D2). Passes the adapter's
+  // resolved contentPipeline (SPI v1.3, ADR-0020).
   const hashSource = (assetType, id, sourceRelPath, sourceAbs) => {
     const { resultBuf } = applyAdapterTransform(
       { assetType, id, sourceRelPath, sourceAbs },
-      adapter?.transformAssetContent,
+      adapter?.contentPipeline,
       { adapterId: adapter?.id ?? null, stage: "plan" }
     );
     return hashBytes(resultBuf, { extension: path.extname(sourceAbs) });

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 import * as opencode from "./opencode.mjs";
+import { applyDefaults } from "./spi.mjs";
 import { applyAdapterTransform } from "../core/plan.mjs";
 import { stageAsset } from "../core/stage-asset.mjs";
 import { hashFile, makeStagingDir } from "../core/filesystem.mjs";
@@ -89,13 +90,17 @@ test("opencode via applyAdapterTransform: throw surfaces as AdapterError(ERR_TRA
     fs.writeFileSync(p, "---\nname: x\n---\nbody\n"); // no description
     const asset = { assetType: "agent", id: "bad", sourceRelPath: "agents/bad.md", sourceAbs: p };
     try {
-      applyAdapterTransform(asset, opencode.transformAssetContent, { adapterId: "opencode", stage: "stage" });
+      // SPI v1.3: applyAdapterTransform folds a canonical pipeline. The hook
+      // auto-promotes to a 1-stage pipeline (ADR-0020); pass that shape. (F2)
+      const pipeline = [{ id: "transformAssetContent", run: opencode.transformAssetContent }];
+      applyAdapterTransform(asset, pipeline, { adapterId: "opencode", stage: "stage" });
       assert.fail("should throw");
     } catch (e) {
       assert.ok(e instanceof AdapterError);
       assert.equal(e.code, ERR_TRANSFORM_FAILED);
       assert.equal(e.details.adapterId, "opencode");
       assert.equal(e.details.stage, "stage");
+      assert.equal(e.details.stageId, "transformAssetContent");
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -107,7 +112,10 @@ test("opencode via stageAsset: transformed agent staged, cross-stage invariant h
   try {
     const stagingDir = makeStagingDir(root, "ocrun");
     const asset = { assetType: "agent", id: "example-agent", sourceRelPath: "agents/sample-example-agent.md", sourceAbs: SAMPLE_AGENT };
-    const r = stageAsset({ asset, adapter: opencode, stagingDir, targetRel: "agent/sample-example-agent.md" });
+    // Resolve the adapter through applyDefaults so its transformAssetContent
+    // auto-promotes to a 1-stage contentPipeline (SPI v1.3, ADR-0020) — the
+    // shape stageAsset now consumes. Regression guard for auto-promotion.
+    const r = stageAsset({ asset, adapter: applyDefaults(opencode), stagingDir, targetRel: "agent/sample-example-agent.md" });
     assert.equal(r.transformed, true, "non-identity transform on an agent");
     const staged = path.join(stagingDir, "agent/sample-example-agent.md");
     assert.equal(r.sha256, hashFile(staged).sha256, "ADR-0002 D2 invariant: sha256 == hashFile(staged)");
