@@ -185,6 +185,7 @@ test("doctorCommand: folds a passing adapter probe into the report", () => {
   const check = out.reports[0].checks.find((c) => c.name === "plugin-config");
   assert.ok(check, "probe check is present in the report");
   assert.equal(check.ok, true);
+  assert.ok(check.detail.includes("checked"), "probe detail string is forwarded into the report");
 });
 
 test("doctorCommand: a failing adapter probe flips report.ok to false", () => {
@@ -220,6 +221,7 @@ test("doctorCommand: a non-array doctorProbes return is surfaced as a failed che
   });
   const check = out.reports[0].checks.find((c) => c.name === "adapter-probes");
   assert.ok(check && check.ok === false, "malformed return yields a failed adapter-probes check");
+  assert.ok(check.detail.includes("did not return an array"), "diagnostic text present in detail");
 });
 
 test("doctorCommand: --target override scopes the health report to the requested sandbox", () => {
