@@ -63,14 +63,20 @@ deferred to a later revision if a real need appears.
 `createAdapterRegistry` resolves each adapter to one canonical pipeline:
 
 1. `contentPipeline` present and non-empty → use it verbatim.
-2. else `transformAssetContent` is a genuine override (i.e.
-   `!== SPI_DEFAULTS.transformAssetContent`) → synthesize a 1-stage pipeline
-   `[{ id: "transformAssetContent", run: hook }]`. (Comparing against the
-   kernel's *own* `SPI_DEFAULTS.transformAssetContent` identity is a
-   kernel-internal reference the kernel owns — it is **not** the out-of-contract
-   `SPI_DEFAULTS`-identity / `Function.length` "no-override" detection that
-   ADR-0010 forbids adapter authors from relying on.)
+2. else `transformAssetContent` is declared by the author (i.e.
+   `typeof adapter.transformAssetContent === "function"`) → synthesize a 1-stage
+   pipeline `[{ id: "transformAssetContent", run: hook }]`.
 3. else → empty pipeline (identity).
+
+**As-built note (reconciled post-review):** `applyDefaults` decides promotion by
+inspecting the **raw** adapter (`typeof adapter.transformAssetContent === "function"`)
+*before* the default-fill loop runs, so the kernel's injected
+`SPI_DEFAULTS.transformAssetContent` is never present at the decision point — no
+`SPI_DEFAULTS`-reference comparison is needed or performed. (The mutual-exclusion
+guard is also intrinsic to `applyDefaults`, so a both-declared adapter fails loud
+on every call path, not only through `validateAdapter`.) This is stricter and
+simpler than the reference-identity wording originally drafted here; the code is
+authoritative.
 
 `applyAdapterTransform` becomes a fold over the resolved stages, threading the
 Buffer stage → stage. The `transformed` flag is recomputed once against the

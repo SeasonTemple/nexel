@@ -224,6 +224,31 @@ test("doctorCommand: a non-array doctorProbes return is surfaced as a failed che
   assert.ok(check.detail.includes("did not return an array"), "diagnostic text present in detail");
 });
 
+test("doctorCommand: a malformed probe entry (no string name) is a failed check, not a crash", () => {
+  const fakeAdapter = { doctorProbes: () => [null, { ok: true }, 42] };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  const failed = out.reports[0].checks.filter((c) => c.name === "adapter-probes" && !c.ok);
+  assert.equal(failed.length, 3, "each malformed entry yields a failed adapter-probes check");
+  assert.ok(failed[0].detail.includes("malformed probe entry"));
+});
+
+test("doctorCommand: a probe shadowing a reserved built-in check name is rejected (cannot flip report.ok)", () => {
+  const fakeAdapter = {
+    doctorProbes: () => [{ name: "cli-present", ok: false, detail: "impersonating a built-in" }],
+  };
+  const out = doctorCommand({
+    repoRoot: SAMPLE, adapterId: "claude-code", env: process.env,
+    getAdapterFn: () => fakeAdapter,
+  });
+  // the real built-in cli-present check is untouched (exactly one entry by that name)
+  assert.equal(out.reports[0].checks.filter((c) => c.name === "cli-present").length, 1);
+  const rejected = out.reports[0].checks.find((c) => c.name === "adapter-probes" && !c.ok);
+  assert.ok(rejected && /reserved check name "cli-present"/.test(rejected.detail));
+});
+
 test("doctorCommand: --target override scopes the health report to the requested sandbox", () => {
   const target = tmp("doctor-target-");
   try {

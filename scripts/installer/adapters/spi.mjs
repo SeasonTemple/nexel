@@ -205,13 +205,11 @@ export function validateAdapter(adapter) {
  * resolve the canonical SPI v1.3 content pipeline. Returns a *new*
  * adapter-shaped object (the input is not mutated).
  *
- * PRECONDITION: the adapter must already have passed `validateAdapter`.
- * `createAdapterRegistry` enforces this (it calls `validateAdapter` before
- * `applyDefaults`). Calling `applyDefaults` directly on un-validated raw input
- * skips the `contentPipeline`+`transformAssetContent` mutual-exclusion guard
- * (ADR-0020 D3): a both-declared adapter would keep its pipeline and silently
- * drop the hook here. Always go through `createAdapterRegistry`; do not call
- * `applyDefaults` standalone on raw author input.
+ * The `contentPipeline`+`transformAssetContent` mutual-exclusion guard is
+ * INTRINSIC to this function (re-checked below), so calling `applyDefaults`
+ * standalone on raw author input is safe — a both-declared adapter fails loud
+ * here, not only in `validateAdapter`. (`createAdapterRegistry` still validates
+ * first for the full required/shape checks.)
  */
 export function applyDefaults(adapter) {
   // Capture the author's declarations BEFORE the fill loop injects defaults, so
@@ -220,6 +218,16 @@ export function applyDefaults(adapter) {
   // `declaredPipeline` is a non-empty author pipeline.
   const declaredHook = typeof adapter.transformAssetContent === "function";
   const declaredPipeline = Array.isArray(adapter.contentPipeline) && adapter.contentPipeline.length > 0;
+  // Intrinsic mutual-exclusion guard (ADR-0020): fail loud on EVERY call path,
+  // not only via validateAdapter, so the public applyAdapterDefaults export
+  // cannot silently drop the hook for a both-declared adapter.
+  if (declaredPipeline && declaredHook) {
+    throw new AdapterError(
+      `adapter ${adapter.id ?? "(no id)"} declares both contentPipeline and transformAssetContent — declare one, not both`,
+      ERR_ADAPTER_INVALID,
+      { adapterId: adapter.id ?? null },
+    );
+  }
   const out = { ...adapter };
   for (const field of OPTIONAL_FIELDS) {
     if (out[field] === undefined || out[field] === null) {
@@ -228,7 +236,9 @@ export function applyDefaults(adapter) {
   }
   // Resolve the canonical content pipeline (ADR-0020 D2).
   if (declaredPipeline) {
-    // Author declared an explicit pipeline — keep it verbatim.
+    // Author declared an explicit pipeline — keep it verbatim (explicit
+    // assignment, not relying on the spread above).
+    out.contentPipeline = adapter.contentPipeline;
   } else if (declaredHook) {
     // Auto-promote the single declared hook to a 1-stage pipeline.
     out.contentPipeline = Object.freeze([

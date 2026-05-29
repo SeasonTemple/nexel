@@ -841,8 +841,8 @@ export function listCommand({ repoRoot, adapterId, target, productConfig, env = 
   return { skills, bundles, targetRoot, hasState: !!installed };
 }
 
-// Apply NETOPS_PROFILE suffix to each adapter's targetRoot. Validates the
-// profile name; throws ERR_INVALID_PROFILE on bad input.
+// Apply the productConfig.envProfile suffix to each adapter's targetRoot.
+// Validates the profile name; throws ERR_INVALID_PROFILE on bad input.
 function applyProfileToAdapters(adapters, env) {
   const profile = resolveProfile({ env });
   if (!profile) return adapters;
@@ -875,6 +875,20 @@ export function agentsCommand({ repoRoot, env = process.env } = {}) {
  *  - lock file age (stale lock detection)
  *  - per-managed-file existence + hash match (sampled — limit cost)
  */
+// Built-in doctor check names. Adapter-contributed doctorProbes may not reuse
+// any of these (it would shadow a kernel check and could flip report.ok).
+const RESERVED_CHECK_NAMES = new Set([
+  "cli-present",
+  "target-exists",
+  "target-writable",
+  "state-readable",
+  "state-schema",
+  "state-selections-known",
+  "lock-state",
+  "managed-files",
+  "adapter-probes",
+]);
+
 export function doctorCommand({ repoRoot, adapterId, target, productConfig, env = process.env, getAdapterFn = getAdapter } = {}) {
   const adapters = applyProfileToAdapters(listAdapterStatus({ env }), env);
   const filtered = (adapterId
@@ -1014,10 +1028,14 @@ export function doctorCommand({ repoRoot, adapterId, target, productConfig, env 
         add("adapter-probes", false, `adapter ${a.id} doctorProbes did not return an array`);
       } else {
         for (const p of probes) {
-          if (p && typeof p.name === "string") {
-            add(p.name, !!p.ok, p.detail);
-          } else {
+          if (!p || typeof p.name !== "string") {
             add("adapter-probes", false, `adapter ${a.id} returned a malformed probe entry`);
+          } else if (RESERVED_CHECK_NAMES.has(p.name)) {
+            // A probe must not shadow a built-in check name — duplicate names
+            // could flip report.ok or confuse name-keyed consumers.
+            add("adapter-probes", false, `adapter ${a.id} probe used reserved check name "${p.name}"`);
+          } else {
+            add(p.name, !!p.ok, typeof p.detail === "string" ? p.detail : "");
           }
         }
       }

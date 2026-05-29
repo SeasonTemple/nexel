@@ -105,6 +105,29 @@ test("applyDefaults: explicit multi-stage contentPipeline is kept verbatim, orde
   assert.deepEqual(prepared.contentPipeline.map((s) => s.id), ["a", "b"]);
 });
 
+test("applyDefaults: both-declared fails loud intrinsically (guard not only in validateAdapter)", () => {
+  // The public applyAdapterDefaults export must not silently drop the hook when
+  // called standalone on a both-declared adapter (review: api-contract/adversarial).
+  const bad = makeMinimalAdapter({
+    contentPipeline: [{ id: "s", run: (a, b) => b }],
+    transformAssetContent: (a, b) => b,
+  });
+  assert.throws(
+    () => applyDefaults(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID"
+      && /both contentPipeline and transformAssetContent/.test(e.message),
+  );
+});
+
+test("applyDefaults: empty contentPipeline [] + hook is NOT both-declared — hook auto-promotes", () => {
+  // `[]` has length 0, so it is treated as 'no pipeline'; the hook promotes and
+  // the mutual-exclusion guard does not fire.
+  const customXf = (asset, body) => body;
+  const prepared = applyDefaults(makeMinimalAdapter({ contentPipeline: [], transformAssetContent: customXf }));
+  assert.equal(prepared.contentPipeline.length, 1);
+  assert.equal(prepared.contentPipeline[0].run, customXf);
+});
+
 test("validateAdapter: declaring both contentPipeline and transformAssetContent throws ERR_ADAPTER_INVALID", () => {
   const bad = makeMinimalAdapter({
     contentPipeline: [{ id: "s", run: (a, b) => b }],
