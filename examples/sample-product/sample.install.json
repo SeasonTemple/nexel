@@ -18,8 +18,12 @@
       "profile": "bundle",
       "description": "Bundle-profile skill that pulls in the sample agent + rule via dependencies.",
       "dependencies": {
-        "agents": ["example-agent"],
-        "rules": ["rules/sample-rule.md"]
+        "agents": [
+          "example-agent"
+        ],
+        "rules": [
+          "rules/sample-rule.md"
+        ]
       }
     },
     "sample:sample-host-context": {
@@ -49,8 +53,12 @@
     "sample-demo": {
       "id": "sample-demo",
       "description": "Demo bundle that installs the demo-bundle-skill plus its agent + rule dependencies.",
-      "skills": ["sample:demo-bundle-skill"],
-      "agents": ["example-agent"]
+      "skills": [
+        "sample:demo-bundle-skill"
+      ],
+      "agents": [
+        "example-agent"
+      ]
     }
   }
 }

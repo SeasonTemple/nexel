@@ -45,6 +45,7 @@ nexel/
 | `npm test` | Run the full test suite |
 | `npm run lint:skills` | Lint SKILL.md frontmatter (use `--dir=<path>` and `--id-prefix=<prefix>` to target a product) |
 | `npm run lint:manifest` | Validate `install.json` against the schema |
+| `npm run rebuild:manifest` | Derive `install.json` skill entries from `SKILL.md` frontmatter (merge-preserves authored fields); `:check` variant regen-and-diffs without writing |
 | `npm run lint:drift` | Detect drift between manifest and disk |
 | `npm run lint:commit-msg -- .git/COMMIT_EDITMSG` | Validate commit message format |
 | `npm run lint:release-sync` | Check `package.json` version == newest `docs/release-notes/v*.md` (semver; also runs in pre-commit) |

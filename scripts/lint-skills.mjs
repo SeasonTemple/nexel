@@ -4,9 +4,11 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 import { isValidOpenCodeInstructionsPath, readOpenCodeInstructions } from "./installer/core/skill-metadata.mjs";
-import { FRONTMATTER_RE } from "./installer/core/manifest/schema.mjs";
-const CATEGORIES = new Set(["principle", "best-practice", "test", "review", "tool", "setup"]);
-export const VALID_CATEGORIES = Object.freeze([...CATEGORIES]);
+import { FRONTMATTER_RE, CATEGORY_SET } from "./installer/core/manifest/schema.mjs";
+// Single source of truth: the category enum lives in schema.mjs. Keep the
+// VALID_CATEGORIES export (consumed by lint-skills.test.mjs) derived from it so
+// the linter and rebuild-manifest can never silently disagree on the enum.
+export const VALID_CATEGORIES = Object.freeze([...CATEGORY_SET]);
 
 export function stripBom(s) {
   return s.length > 0 && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
@@ -65,7 +67,7 @@ export function validateSkill(dirname, frontmatterText, options = {}) {
     findings.push({ severity: "error", message: `missing required field: category (one of: ${VALID_CATEGORIES.join(", ")})` });
   } else if (typeof cat !== "string") {
     findings.push({ severity: "error", message: `category must be a string, got ${typeof cat}` });
-  } else if (!CATEGORIES.has(cat)) {
+  } else if (!CATEGORY_SET.has(cat)) {
     findings.push({ severity: "error", message: `category mismatch: "${cat}" not in {${VALID_CATEGORIES.join(", ")}}` });
   }
   validateOpenCodeInstructions(parsed, frontmatterText, findings);
