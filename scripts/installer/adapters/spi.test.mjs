@@ -141,9 +141,25 @@ test("validateAdapter: duplicate stage id within one pipeline throws ERR_ADAPTER
     (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID" && /duplicate stage id "dup"/.test(e.message));
 });
 
+test("validateAdapter: null/primitive stage entries throw ERR_ADAPTER_INVALID", () => {
+  const bad = makeMinimalAdapter({ contentPipeline: [null, 42, "str"] });
+  assert.throws(() => validateAdapter(bad),
+    (e) => e instanceof AdapterError && e.code === "ERR_ADAPTER_INVALID"
+      && /contentPipeline\[0\]/.test(e.message) && /contentPipeline\[1\]/.test(e.message)
+      && /contentPipeline\[2\]/.test(e.message),
+    "each non-object entry must be reported by index");
+});
+
 test("validateAdapter: a valid explicit pipeline (no hook) passes", () => {
   const ok = makeMinimalAdapter({ contentPipeline: [{ id: "x", run: (a, b) => b }] });
   assert.doesNotThrow(() => validateAdapter(ok));
+});
+
+test("applyDefaults: no-hook adapter's empty pipeline is the shared frozen default (reference)", () => {
+  // Pins the resolution's reuse of SPI_DEFAULTS.contentPipeline for the empty
+  // case so every no-hook adapter shares one frozen instance (ADR-0020 A2).
+  const prepared = applyDefaults(makeMinimalAdapter());
+  assert.equal(prepared.contentPipeline, SPI_DEFAULTS.contentPipeline);
 });
 
 test("validateAdapter: missing required-4 fields are all reported", () => {

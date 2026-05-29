@@ -156,10 +156,10 @@ export function validateAdapter(adapter) {
       malformed.push({ field: "contentPipeline", reason: "must be an array of { id, run } stages" });
     } else {
       const seenIds = new Set();
-      cp.forEach((stage, i) => {
+      for (const [i, stage] of cp.entries()) {
         if (!stage || typeof stage !== "object") {
           malformed.push({ field: `contentPipeline[${i}]`, reason: "must be a { id, run } object" });
-          return;
+          continue;
         }
         if (typeof stage.id !== "string" || stage.id === "") {
           malformed.push({ field: `contentPipeline[${i}].id`, reason: "must be a non-empty string" });
@@ -171,7 +171,7 @@ export function validateAdapter(adapter) {
         if (typeof stage.run !== "function") {
           malformed.push({ field: `contentPipeline[${i}].run`, reason: "must be a function" });
         }
-      });
+      }
       // Fail loud when both a non-empty pipeline AND a hook are declared: a
       // single hook auto-promotes to a 1-stage pipeline, so declaring both is
       // almost certainly a half-migration or mistake.
@@ -201,28 +201,35 @@ export function validateAdapter(adapter) {
 }
 
 /**
- * Apply SPI_DEFAULTS for any optional field the adapter did not export.
- * Returns a *new* adapter-shaped object (the input is not mutated).
+ * Apply SPI_DEFAULTS for any optional field the adapter did not export, and
+ * resolve the canonical SPI v1.3 content pipeline. Returns a *new*
+ * adapter-shaped object (the input is not mutated).
+ *
+ * PRECONDITION: the adapter must already have passed `validateAdapter`.
+ * `createAdapterRegistry` enforces this (it calls `validateAdapter` before
+ * `applyDefaults`). Calling `applyDefaults` directly on un-validated raw input
+ * skips the `contentPipeline`+`transformAssetContent` mutual-exclusion guard
+ * (ADR-0020 D3): a both-declared adapter would keep its pipeline and silently
+ * drop the hook here. Always go through `createAdapterRegistry`; do not call
+ * `applyDefaults` standalone on raw author input.
  */
 export function applyDefaults(adapter) {
+  // Capture the author's declarations BEFORE the fill loop injects defaults, so
+  // the auto-promotion decision does not depend on SPI_DEFAULTS reference
+  // identity (ADR-0020). `declaredHook` is the author's own transformAssetContent;
+  // `declaredPipeline` is a non-empty author pipeline.
+  const declaredHook = typeof adapter.transformAssetContent === "function";
+  const declaredPipeline = Array.isArray(adapter.contentPipeline) && adapter.contentPipeline.length > 0;
   const out = { ...adapter };
   for (const field of OPTIONAL_FIELDS) {
     if (out[field] === undefined || out[field] === null) {
       out[field] = SPI_DEFAULTS[field];
     }
   }
-  // SPI v1.3 (ADR-0020): resolve the canonical content pipeline. After the fill
-  // loop, out.transformAssetContent is always a function (author's or the
-  // injected identity default) and out.contentPipeline is always an array. The
-  // `!== SPI_DEFAULTS.transformAssetContent` check below is LOAD-BEARING: it is
-  // the sole guard stopping the kernel from auto-promoting its OWN injected
-  // identity default into a spurious 1-stage pipeline, and it works only while
-  // that default is shared by reference. Do NOT make SPI_DEFAULTS.transformAssetContent
-  // a fresh per-call arrow — every no-hook adapter would silently gain a 1-stage
-  // identity pipeline and lose the empty-pipeline / same-Buffer fast path.
-  if (out.contentPipeline.length > 0) {
+  // Resolve the canonical content pipeline (ADR-0020 D2).
+  if (declaredPipeline) {
     // Author declared an explicit pipeline — keep it verbatim.
-  } else if (out.transformAssetContent !== SPI_DEFAULTS.transformAssetContent) {
+  } else if (declaredHook) {
     // Auto-promote the single declared hook to a 1-stage pipeline.
     out.contentPipeline = Object.freeze([
       { id: "transformAssetContent", run: out.transformAssetContent },
